@@ -76,372 +76,8 @@ temp_dir = None
 
 stable_directory = os.getcwd()
 
-# GUI UTILITIES
-t1 = None
-report_dir_path = None
-
-
-class GUI:
-    def init(self):
-        try:
-            self.gui_app = Tk()
-            self.gui_app.title("Scaner")
-            self.gui_app.geometry('400x600')
-            self.gui_app.iconbitmap('sea-turtle.ico')
-            # Styles
-            self.style = Style()
-            self.title_font = Font(family="Pristina", size=25)
-            self.label_font = Font(family="Lucida Grande", size=10)
-            self.progress_font = Font(family='Pristina', size=10)
-            self.style.configure('B1.TButton', font=('Juice ITC', 10, 'bold'), foreground='green')
-            self.style.configure('B2.TButton', font=('Juice ITC', 10, 'bold'), foreground='red')
-            self.style.configure('B3.TButton', font=('Juice ITC', 10, 'bold'), foreground='black')
-            # Inside Title
-
-            self.title_label = Label(self.gui_app, text='Scanner', font=self.title_font)
-            self.title_label.pack(pady=10)
-
-            # Progress
-
-            self.progress_bar = Progressbar(self.gui_app, orient=HORIZONTAL, length=250, mode='determinate')
-            self.progress_bar.pack(pady=10)
-
-            # Label
-            self.progress_label = Label(self.gui_app, text='Performed:', font=self.progress_font, justify='left')
-            self.progress_label.pack(pady=4)
-
-            # Scroll Bar
-            self.frame = Frame(self.gui_app)
-            self.scrollbar = Scrollbar(self.frame, orient=VERTICAL)
-            self.scrollbar_h = Scrollbar(self.frame, orient=HORIZONTAL)
-
-            # List
-            self.list = Listbox(self.frame, width=39, height=19, yscrollcommand=self.scrollbar.set,  xscrollcommand=self.scrollbar_h.set)
-            # self.list.insert(END, "")
-            # configure scroll
-            self.scrollbar.config(command=self.list.yview)
-            self.scrollbar.pack(side=RIGHT, fill=Y)
-            self.scrollbar_h.config(command=self.list.xview)
-            self.scrollbar_h.pack(side=BOTTOM, fill=X)
-            self.frame.pack(pady=5)
-            self.list.pack(pady=5)
-            self.list.bind('<Double-1>', func=self.check_selection)
-            # Labels
-            self.label = Label(self.gui_app, text='Press Start to start scanner', font=self.label_font, justify='center')
-            self.label.pack(pady=5, ipady=5, ipadx=5)
-            # Future update
-            # self.check_injections = IntVar()
-            # self.check_broken_auth = IntVar()
-            # self.check_sensitive_data = IntVar()
-            # self.check_xml = IntVar()
-            # self.check_broken_acces = IntVar()
-            # self.check_security = IntVar()
-            # self.check_nmap = IntVar()
-            # Checkbutton(self.gui_app, text="Injections Tests", variable=self.check_injections, onvalue=True, offvalue=False, command=self.modify_injection_tests).pack()
-            # Checkbutton(self.gui_app, text="Broken Authentication Tests", variable=self.check_broken_auth, onvalue=True, offvalue=False, command=self.modify_broken_tests).pack()
-            # Checkbutton(self.gui_app, text="Sensitive Data Exposure Tests", variable=self.check_sensitive_data, onvalue=True, offvalue=False, command=self.modify_sensitive_tests).pack()
-            # Checkbutton(self.gui_app, text="XML Tests", variable=self.check_xml, onvalue=True, offvalue=False, command=self.modify_xml_tests).pack()
-            # Checkbutton(self.gui_app, text="Broken Access Control Tests", variable=self.check_broken_acces, onvalue=True, offvalue=False, command=self.modify_broken_access_tests).pack()
-            # Checkbutton(self.gui_app, text="Security Tests", variable=self.check_security, onvalue=True, offvalue=False, command=self.modify_security_tests).pack()
-            # Checkbutton(self.gui_app, text="NMAP Test", variable=self.check_nmap, onvalue=True, offvalue=False, command=self.modify_nmap_tests).pack()
-            self.start_button = Button(self.gui_app, text="Start", command=self.start_scan, style='B1.TButton')
-            self.start_button.pack(pady=5)
-
-            self.stop_button = Button(self.gui_app, text="Stop and Quit", command=self.stop_scan, style='B2.TButton')
-            self.stop_button.pack(pady=5)
-            self.stop_button['state'] = DISABLED
-
-            self.config_button = Button(self.gui_app, text="config.ini", command=self.open_config)
-            self.config_button.place(rely=1.0, relx=1.0, x=0, y=0, anchor=SE)
-
-            self.gui_app.mainloop()
-        except Exception as e:
-            print(e)
-
-    # def modify_injection_tests(self):
-    #     config_object.set('TEST', 'test_injection', str(self.check_injections.get()))
-    #     with open('config/config.ini', 'w') as configfile:
-    #         config_object.write(configfile)
-    #
-    # def modify_broken_tests(self):
-    #     config_object.set('TEST', 'test_broken_auth', str(self.check_injections.get()))
-    #     with open('config/config.ini', 'w') as configfile:
-    #         config_object.write(configfile)
-    #
-    # def modify_sensitive_tests(self):
-    #     config_object.set('TEST', 'test_sensitive_data_exposure', str(self.check_injections.get()))
-    #     with open('config/config.ini', 'w') as configfile:
-    #         config_object.write(configfile)
-    #
-    # def modify_xml_tests(self):
-    #     config_object.set('TEST', 'test_xml_external_entities', str(self.check_injections.get()))
-    #     with open('config/config.ini', 'w') as configfile:
-    #         config_object.write(configfile)
-    #
-    # def modify_broken_access_tests(self):
-    #     config_object.set('TEST', 'test_broken_access_control', str(self.check_injections.get()))
-    #     with open('config/config.ini', 'w') as configfile:
-    #
-    #         config_object.write(configfile)
-    #
-    # def modify_security_tests(self):
-    #     config_object.set('TEST', 'test_security_misconfiguration', str(self.check_injections.get()))
-    #     with open('config/config.ini', 'w') as configfile:
-    #         config_object.write(configfile)
-    #
-    # def modify_nmap_tests(self):
-    #     config_object.set('TEST', 'nmap_scan', str(self.check_injections.get()))
-    #     with open('config/config.ini', 'w') as configfile:
-    #         config_object.write(configfile)
-
-    def start_scan(self):
-        try:
-            global t1
-            try:
-                if self.open_report:
-                    self.open_report.pack_forget()
-                    self.close_button.pack_forget()
-                    self.stop_button = Button(self.gui_app, text="Stop and Quit", command=self.stop_scan, style='B2.TButton')
-                    self.stop_button.pack(pady=5)
-            except Exception:
-                pass
-            try:
-                if self.list.index("end") != 0:
-                    self.list.delete(0, 'end')
-            except Exception:
-                pass
-            self.gui_app.geometry('400x600')
-            self.label.config(text='Wait..')
-            self.state = 'started'
-            self.start_button['state'] = DISABLED
-            self.start_button.config(text='Scan')
-            self.stop_button['state'] = NORMAL
-            self.progress_bar['value'] = 0
-            t1 = threading.Thread(target=start_program)
-            t1.start()
-        except Exception as e:
-            print(e)
-
-    def stop_scan(self):
-        try:
-            self.stop_button['state'] = DISABLED
-            self.start_button['state'] = NORMAL
-            self.label.config(text="Scan stopped!")
-            self.kill_thread(t1)
-            self.gui_app.quit()
-            quit()
-        except Exception as e:
-            print(e)
-
-    def done_label(self):
-        try:
-            self.state = 'stopped'
-            self.stop_button.pack_forget()
-            try:
-                if self.open_report:
-                    self.open_report.pack_forget()
-                    self.close_button.pack_forget()
-            except Exception:
-                pass
-            self.gui_app.geometry('400x660')
-            self.open_report = Button(self.gui_app, text="Open Report", command=self.open_output, style='B1.TButton')
-            self.open_report.pack(pady=5)
-            self.close_button = Button(self.gui_app, text="Close", command=self.stop_scan, style='B3.TButton')
-            self.close_button.pack(pady=5)
-            self.start_button['state'] = NORMAL
-            self.start_button.config(text="New Scan")
-            self.label.config(text="DONE!\nPress 'Open Report' to view reports!\nYou can double-click on each item in the list for more information")
-            self.gui_app.update()
-            try:
-                shutil.rmtree(temp_dir)
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    @staticmethod
-    def open_output():
-        try:
-            subprocess.Popen(f'explorer {report_dir_path}')
-        except Exception:
-            pass
-
-    @staticmethod
-    def kill_thread(thread):
-        try:
-            thread_id = thread.ident
-            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(SystemExit))
-            if res > 1:
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
-                print('Exception raise failure')
-        except Exception:
-            pass
-
-    def contain(self, item):
-        try:
-            contains = item in self.list.get(0, "end")
-            return contains
-        except Exception:
-            pass
-
-    def update_list_gui(self, text):
-        try:
-            if not self.contain(text):
-                self.list.insert(END, text)
-        except Exception:
-            pass
-
-    def update_progress_bar(self, amount):
-        try:
-            self.progress_bar['value'] += amount
-            self.gui_app.update_idletasks()
-        except Exception:
-            pass
-
-    @staticmethod
-    def open_config():
-        try:
-            config_path = os.getcwd()
-            config_path = os.path.join(config_path, 'config\\config.ini')
-            subprocess.Popen(f'explorer /select ,{config_path}')
-        except Exception:
-            pass
-
-    def check_selection(self, event):
-        try:
-            if self.state == 'stopped':
-                index_selected = event.widget.curselection()
-                if index_selected:
-                    index = index_selected[0]
-                    selected_text = event.widget.get(index)
-                    self.open_browser(selected_text)
-            return
-        except Exception:
-            pass
-
-    def open_browser(self, text):
-        if text == "Testing Lock-Out Mechanism" or text == 'Checking Lock-Out Mechanism':
-            webbrowser.open("https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/03-Testing_for_Weak_Lock_Out_Mechanism")
-        elif text == 'Trying to enumerate accounts':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/04-Testing_for_Account_Enumeration_and_Guessable_User_Account')
-        elif text == 'Trying BruteForcing Login':
-            webbrowser.open('https://owasp.org/www-community/controls/Blocking_Brute_Force_Attacks')
-        elif text == 'Searching for admin directories':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/05-Enumerate_Infrastructure_and_Application_Admin_Interfaces')
-        elif text == 'Testing for Role Definition Directories':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/01-Test_Role_Definitions')
-        elif text == 'Checking robots.txt':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/03-Review_Webserver_Metafiles_for_Information_Leakage')
-        elif text == 'Testing HTTP Methods':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/v41/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/06-Test_HTTP_Methods')
-        elif text == 'Testing HSTS':
-            webbrowser.open('https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security')
-        elif text == 'Testing RIA':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/08-Test_RIA_Cross_Domain_Policy')
-        elif text == 'Testing TLS':
-            webbrowser.open('https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Protection_Cheat_Sheet.html')
-        elif text == 'Fingerprinting application':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/08-Fingerprint_Web_Application_Framework.html')
-        elif text == 'Trying to get the running port':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/04-Enumerate_Applications_on_Webserver')
-        elif text == 'Trying to get comments and scripts from source':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/05-Review_Webpage_Content_for_Information_Leakage')
-        elif text == 'Testing for JS Code Execution':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/02-Testing_for_JavaScript_Execution.html')
-        elif text == 'Testing for HH Injection':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/17-Testing_for_Host_Header_Injection')
-        elif text == 'Testing for SSRF Injection':
-            webbrowser.open('https://owasp.org/www-community/attacks/Server_Side_Request_Forgery')
-        elif text == 'Testing for browser cache misconfiguration':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/06-Testing_for_Browser_Cache_Weaknesses')
-        elif text == 'Testing XML Injection':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/07-Testing_for_XML_Injection')
-        elif text == 'Testing for LFI Directory Transversal' or text == 'Testing for Cookie Directory Transversal':
-            webbrowser.open('https://owasp.org/www-community/attacks/Path_Traversal')
-        elif text == 'Testing for special request headers':
-            webbrowser.open('https://owasp.org/www-project-secure-headers/')
-        elif text == 'Trying to bypass authentication':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/04-Testing_for_Bypassing_Authentication_Schema')
-        elif text == 'Testing for privilege escalation':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/03-Testing_for_Privilege_Escalation')
-        elif text == 'Testing XSS in forms' or text == 'Testing XSS in links':
-            webbrowser.open('https://owasp.org/www-community/attacks/xss/')
-        elif text == 'Testing for SQL Injection':
-            webbrowser.open('https://owasp.org/www-community/attacks/SQL_Injection')
-        elif text == 'Testing for Code Execution':
-            webbrowser.open('https://owasp.org/www-community/attacks/Code_Injection')
-        elif text == 'Testing for SSI Injection':
-            webbrowser.open('https://owasp.org/www-community/attacks/Server-Side_Includes_(SSI)_Injection')
-        elif text == 'Testing for NOSQL Injection':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/05.6-Testing_for_NoSQL_Injection')
-        elif text == 'Checking form action':
-            webbrowser.open('https://owasp.org/www-community/attacks/Form_action_hijacking')
-        elif text == 'Checking forms for file extensions' or text == 'Testing File Upload Injection':
-            webbrowser.open('https://owasp.org/www-community/vulnerabilities/Unrestricted_File_Upload')
-        elif text == 'Testing for HTML Injection':
-            webbrowser.open('https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/03-Testing_for_HTML_Injection')
-        elif text == 'Checking Session ID':
-            webbrowser.open('https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html`')
-        elif text == 'Testing IDOR':
-            webbrowser.open('https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html')
-
-    def cant_connect(self):
-        try:
-            try:
-                self.state = 'stopped'
-                self.stop_button.pack_forget()
-                try:
-                    if self.open_report:
-                        self.open_report.pack_forget()
-                        self.close_button.pack_forget()
-                except Exception:
-                    pass
-                self.gui_app.geometry('400x610')
-                self.close_button = Button(self.gui_app, text="Close", command=self.stop_scan, style='B3.TButton')
-                self.close_button.pack(pady=5)
-                self.start_button['state'] = NORMAL
-                self.start_button.config(text="New Scan")
-                self.label.config(
-                    text="Can't establish a connection.\nMake sure the URL is valid!")
-                self.gui_app.update()
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-
-def get_number_of_tests():
-    try:
-        test_nr = 0
-        if config_object['TEST']['test_injection'].lower() == 'true':
-            test_nr += 1
-        if config_object['TEST']['test_broken_auth'].lower() == 'true':
-            test_nr += 1
-        if config_object['TEST']['test_sensitive_data_exposure'].lower() == 'true':
-            test_nr += 1
-        if config_object['TEST']['test_xml_external_entities'].lower() == 'true':
-            test_nr += 1
-        if config_object['TEST']['test_broken_access_control'].lower() == 'true':
-            test_nr += 1
-        if config_object['TEST']['test_security_misconfiguration'].lower() == 'true':
-            test_nr += 1
-        if config_object['TEST']['nmap_scan'].lower() == 'true':
-            test_nr += 1
-        return test_nr + 2  # gather info is 1 'test', report is 1
-    except Exception:
-        pass
-
-
-try:
-    tests_performed = get_number_of_tests()
-except Exception:
-    pass
-
-# Colors https://www.codegrepper.com/code-examples/python/print+colored+text+python
-
 
 class OtherUser:
-
     def __init__(self, user, password, url=None, err_file=None):
         try:
             self.error_file = err_file
@@ -837,51 +473,11 @@ class Scanner:
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
-    def get_port(self, url):
-        try:
-            try:
-                my_gui.update_list_gui("Trying to get the running port")
-            except Exception:
-                pass
-            global port_set
-            port = re.findall('(?::\d+)?', url)
-            port = [elem for elem in port if elem]
-            if port:
-                print(port)
-                port = [portt for portt in port if portt][0].strip(':').strip('"')
-                port_set.add(port)
-            return
-        except Exception as e:
-            print("\n[ERROR] Something went wrong when trying to get port number. Error: ", e, file=self.error_file)
-            print("[Error Info] LINK:", url, file=self.error_file)
-            pass
+    def get_port(self):
+        # Get PORTS
 
-    def get_port_info(self, test=False):
-        try:
-            if test:
-                try:
-                    my_gui.update_list_gui("Trying to get port information")
-                except Exception:
-                    pass
-                    pass
-                nmap_scanner = nmap.PortScanner()
-                web_app_ip_address = re.findall('http://(.*?)/', config_object['WEBURL']['target'])
-                if web_app_ip_address:
-                    web_app_ip_address = [ip_address for ip_address in web_app_ip_address if ip_address][0]
-                    nmap_scanner.scan(web_app_ip_address, '0-65535', arguments='–Pn –sT –sV')
-                    print('\nHost : ', nmap_scanner[web_app_ip_address].hostname(), file=self.report_file)
-                    print('State : ', nmap_scanner[web_app_ip_address].state(), file=self.report_file)
-                    for protocol in nmap_scanner[web_app_ip_address].all_protocols():
-                        print('----------', file=self.report_file)
-                        print('Protocol : ', protocol, file=self.report_file)
-                        port_list_inner = nmap_scanner[web_app_ip_address][protocol].keys()
-                        port_list_inner.sort()
-                        for port in port_list_inner:
-                            print('Port : ', port, '\tState : ', nmap_scanner[web_app_ip_address][protocol][port]['state'], file=self.report_file)
-            return
-        except Exception as e:
-            print("\n[ERROR] Something went wrong when trying nmap scan on web app. Error: ", e, file=self.error_file)
-            pass
+    def get_port_info(self):
+        #Get PORTS and INFO
 
     def get_comments_dtds_scripts_from_content(self, url):
         try:
@@ -913,7 +509,7 @@ class Scanner:
 
         # A1:2017-Injection
 
-    def test_sql(self, form, url):
+    def test_sql(self, form, url): # Add more payloads
         try:
             try:
                 my_gui.update_list_gui("Testing for SQL Injection")
@@ -941,7 +537,7 @@ class Scanner:
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
-    def test_nosql(self, form, url):
+    def test_nosql(self, form, url): # Add more payloads
         try:
             try:
                 my_gui.update_list_gui("Testing for NOSQL Injection")
@@ -966,7 +562,7 @@ class Scanner:
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
-    def code_exec(self, form, url):
+    def code_exec(self, form, url): # Add more payloads
         try:
             try:
                 my_gui.update_list_gui("Testing for Code Execution")
@@ -981,7 +577,7 @@ class Scanner:
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
-    def javascript_exec(self, url):
+    def javascript_exec(self, url): # Add more payloads
         try:
             try:
                 my_gui.update_list_gui("Testing for JS Code Execution")
@@ -999,7 +595,7 @@ class Scanner:
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
-    def html_injection(self, url):
+    def html_injection(self, url): # Add more payloads
         try:
             try:
                 my_gui.update_list_gui("Testing for HTML Injection")
@@ -1014,7 +610,7 @@ class Scanner:
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
-    def ssi_injection(self, form, url):
+    def ssi_injection(self, form, url): # Add more payloads
         try:
             try:
                 my_gui.update_list_gui("Testing for SSI Injection")
@@ -1047,7 +643,7 @@ class Scanner:
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
-    def ssrf_injection(self, url):
+    def ssrf_injection(self, url): # Add more payloads
         try:
             try:
                 my_gui.update_list_gui("Testing for SSRF Injection")
@@ -2425,12 +2021,5 @@ def start_program():
         pass
 
 
-try:
-    if platform.system() == "Windows":
-        my_gui = GUI()
-        my_gui.init()
-        my_gui.gui_app.quit()
-    else:
-        start_program()
-except Exception:
-    pass
+
+start_program()
