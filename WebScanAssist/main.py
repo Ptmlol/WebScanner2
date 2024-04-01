@@ -1,8 +1,11 @@
 import platform
+import sys
+
 import requests
 import urllib.parse
 import urllib.request
 from bs4 import BeautifulSoup
+import argparse
 import os
 # import queue
 # import socket
@@ -15,7 +18,7 @@ import os
 # import threading
 # import ctypes
 # import sys
-# import re
+import re
 # import subprocess
 # import shutil
 # import webbrowser
@@ -300,59 +303,70 @@ import os
 #         except Exception:
 #             pass
 
-
-class Scanner:
-    def __init__(self, url, ignored_links, file_for_report, file_for_mapping_app, err_file):
+class ScanConfigParameters:
+    def __init__(self, url=None):
         try:
-            self.error_file = err_file
-            self.session = requests.Session()
-            self.target_url = url
-            self.target_links = []
-            self.ignored_links = ignored_links
-            self.cookie_list = []
-            self.visited = []
-            self.report_file = file_for_report
-            self.map_file = file_for_mapping_app
+            try: # Try to read an exiting error file, create one is none is found.
+                self.err_file = open('err_file.log', 'r')
+            except FileNotFoundError:
+                self.err_file = open('err_file.log', "w")  # Error Output File
+                self.err_file.write("Error File")
+                self.err_file.close()
+            self.session = requests.Session()  # Session for current run
+            self.url = url  # Target URL
+
+            try:  # Try to read an existing link Ignore file, create one if none is found.
+                self.ignored_links = open('linkignore.log', 'r')
+            except FileNotFoundError:
+                self.ignored_links = open('linkignore.log', "w")  # Error Output File
+                self.ignored_links.write("www.exampleurl.com")
+                self.ignored_links.close()
         except Exception as e:
-            print("\n[ERROR] Something went wrong when initializing tests. Error: ", e, file=self.error_file)
-            print("[Error Info] LINK:", self.target_url, file=self.error_file)
+            print("\n[ERROR] Something went wrong when initializing tests. Error: ", e, file=self.err_file)  # Write Errors to File. File is set up in terminal on runtime by providing -ef flag
+            print("[Error Info] LINK:", self.url, file=self.err_file)
             pass
 
-    # Utilities ---------@
 
-    def extract_links(self, url):
-        try:
-            response = self.session.get(url)
-            return re.findall(
-                'href="(.*?)"',
-                str(response.content)
-            )
-        except Exception as e:
-            print("\n[ERROR] Something went wrong when extracting links. Error: ", e, file=self.error_file)
-            print("[Error Info] LINK:", url, file=self.error_file)
-            pass
+class MyParser(argparse.ArgumentParser, ScanConfigParameters):
+    def __init__(self):
+        super(ScanConfigParameters, self)
+        super(MyParser, self).__init__()
+        self.add_argument("-u", "--url", help="Target URL to scan", required=True, dest=self.url) # Provide argument for URL, add argument to URL from ScanConfigParameters class
+        self.add_argument("-i", "--ignored_links", help="Path to file that contains ignored links", default=self.ignored_links)  # Provide ignored links file
 
-    def spider(self, url=None):
+        self.parse_args()
+
+
+class DataStorage:
+    def __init__(self):
+        self.url_list = []
+
+
+class Crawler(ScanConfigParameters):
+    def __init__(self):  # Inherit Parameters from Config Class
+        super(ScanConfigParameters, self).__init__()
+
+    def spider(self, url):
         try:
-            try:
-                my_gui.update_list_gui("Extracting links from application")
-            except Exception:
-                pass
-            if url is None:
-                url = self.target_url
-            extracted_links = self.extract_links(str(url))
-            for extracted_link in extracted_links:
-                extracted_link = urllib.parse.urljoin(url, extracted_link)
-                if "#" in extracted_link:
-                    extracted_link = extracted_link.split("#")[0]
-                if self.target_url in extracted_link and extracted_link not in self.target_links and extracted_link not in self.ignored_links and len(self.target_links) <= int(config_object['TEST']['max_number_of_not_hidden_links']):
-                    print(extracted_link, file=self.map_file)
-                    self.target_links.append(extracted_link)
-                    self.spider(extracted_link)
+            ds = DataStorage()
+            response = self.session.get(url) # Get Response of URL.
+            if response.status_code == 200: # If 200, then endpoint is accessible
+                soup = BeautifulSoup(response.text, "html.parser")
+                for link in soup.find_all('a'):  # Build up URls
+                    href = link.get('href')
+                    if href and not href.startswith('#'):
+                        extracted_url = urllib.parse.urljoin(url, href)
+                        if extracted_url not in ds.url_list:
+                            ds.url_list.append(extracted_url)
+                            print(extracted_url)
+                            self.spider(extracted_url)
+            if response.status_code != 200 and response.status_code != 404 and response.status_code != 500:  # If it's not 200 and not 4XX, means that there are some ways of accessing the URL
+                # Create site map.
+                return
             return
-        except Exception as e:
-            print("\n[ERROR] Something went wrong when crawling for links. Error: ", e, file=self.error_file)
-            print("[Error Info] LINK:", url, file=self.error_file)
+        except Exception as e:  # Add Colors to errors
+            print("\n[ERROR] Something went wrong when crawling for links. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
     # def extract_forms(self, url):
@@ -2023,3 +2037,9 @@ class Scanner:
 #
 #
 # start_program()
+
+
+if __name__ == '__main__':
+    args = MyParser()
+    print("Parser:", args.url)
+
