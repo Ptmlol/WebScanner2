@@ -303,68 +303,64 @@ import re
 #         except Exception:
 #             pass
 
-class ScanConfigParameters:
-    def __init__(self, url=None):
-        try:
-            try: # Try to read an exiting error file, create one is none is found.
-                self.err_file = open('err_file.log', 'r')
-            except FileNotFoundError:
-                self.err_file = open('err_file.log', "w")  # Error Output File
-                self.err_file.write("Error File")
-                self.err_file.close()
-            self.session = requests.Session()  # Session for current run
-            self.url = url  # Target URL
-
-            try:  # Try to read an existing link Ignore file, create one if none is found.
-                self.ignored_links = open('linkignore.log', 'r')
-            except FileNotFoundError:
-                self.ignored_links = open('linkignore.log', "w")  # Error Output File
-                self.ignored_links.write("www.exampleurl.com")
-                self.ignored_links.close()
-        except Exception as e:
-            print("\n[ERROR] Something went wrong when initializing tests. Error: ", e, file=self.err_file)  # Write Errors to File. File is set up in terminal on runtime by providing -ef flag
-            print("[Error Info] LINK:", self.url, file=self.err_file)
-            pass
-
-
-class MyParser(argparse.ArgumentParser, ScanConfigParameters):
-    def __init__(self):
-        super(ScanConfigParameters, self)
-        super(MyParser, self).__init__()
-        self.add_argument("-u", "--url", help="Target URL to scan", required=True, dest=self.url) # Provide argument for URL, add argument to URL from ScanConfigParameters class
-        self.add_argument("-i", "--ignored_links", help="Path to file that contains ignored links", default=self.ignored_links)  # Provide ignored links file
-
-        self.parse_args()
-
-
 class DataStorage:
     def __init__(self):
         self.url_list = []
 
 
+class ScanConfigParameters:
+    def __init__(self, url, ignored_links_path):
+        try:
+            try:  # Try to read an exiting error file, create one is none is found.
+                self.err_file = open('err_file.log', 'a')
+                self.err_file.write("Error File")
+            except Exception:
+                print("Something went wrong when opening the Error File")
+                quit()
+            try:  # Try to read an existing link Ignore file, create one if none is found.
+                self.ignored_links = open(ignored_links_path + '/linkignore.log', 'a')
+                self.ignored_links.write("www.exampleurl.com")
+            except Exception as e:
+                print("Something went wrong when opening the Ignored Links file. Please check Error File")
+                print("\n[ERROR] Something went opening the Ignored Links file. Error: ", e,
+                      file=self.err_file)  # Write Errors to File.
+                print("[Error Info] URL:", self.url, file=self.err_file)
+                quit()
+            self.session = requests.Session()  # Session for current run
+            self.url = url
+            self.ds = DataStorage()
+        except Exception as e:
+            print("Something went wrong. Please check error file")
+            print("\n[ERROR] Something went wrong when initializing tests. Error: ", e, file=self.err_file)  # Write
+            # Errors to File.
+            print("[Error Info] URL:", self.url, file=self.err_file)
+            quit()
+
+
 class Crawler(ScanConfigParameters):
-    def __init__(self):  # Inherit Parameters from Config Class
-        super(ScanConfigParameters, self).__init__()
+    def __init__(self, url, ignored_links_path):  # Inherit Parameters from Config Class
+        ScanConfigParameters.__init__(self, url, ignored_links_path)
 
     def spider(self, url):
         try:
-            ds = DataStorage()
-            response = self.session.get(url) # Get Response of URL.
-            if response.status_code == 200: # If 200, then endpoint is accessible
+            response = self.session.get(url)  # Get Response of URL.
+            if response.status_code == 200:  # If 200, then endpoint is accessible
                 soup = BeautifulSoup(response.text, "html.parser")
                 for link in soup.find_all('a'):  # Build up URls
                     href = link.get('href')
                     if href and not href.startswith('#'):
                         extracted_url = urllib.parse.urljoin(url, href)
-                        if extracted_url not in ds.url_list:
-                            ds.url_list.append(extracted_url)
+                        if extracted_url not in self.ds.url_list:
+                            self.ds.url_list.append(extracted_url)
                             print(extracted_url)
                             self.spider(extracted_url)
-            if response.status_code != 200 and response.status_code != 404 and response.status_code != 500:  # If it's not 200 and not 4XX, means that there are some ways of accessing the URL
+            if response.status_code != 200 and response.status_code != 404 and response.status_code != 500:  # If
+                # it's not 200 and not 4XX, means that there are some ways of accessing the URL
                 # Create site map.
                 return
             return
         except Exception as e:  # Add Colors to errors
+            print("Something went wrong. Please check error file")
             print("\n[ERROR] Something went wrong when crawling for links. Error: ", e, file=self.err_file)
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
@@ -2040,6 +2036,12 @@ class Crawler(ScanConfigParameters):
 
 
 if __name__ == '__main__':
-    args = MyParser()
-    print("Parser:", args.url)
+    parser = argparse.ArgumentParser(description='Scan Web Application for Vulnerabilities')
+    parser.add_argument("url", type=str, help="Provide an URL to scan")  # Provide argument for URL, add argument to
+    # URL from ScanConfigParameters class
+    parser.add_argument("-i", "--ignored_links_path", help="Absolute Path to ignored links file", default=os.getcwd())  # Provide
+    # ignored links file
+
+    args = parser.parse_args()
+    Crawler(args.url, args.ignored_links_path).spider(args.url)
 
