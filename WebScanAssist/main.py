@@ -314,31 +314,39 @@ class DataStorage:
 
 
 class ScanConfigParameters:
+
     def __init__(self, url, ignored_links_path):
+
         try:
             self.url = url
             self.session = requests.Session()  # Session for current run
             self.DataStorage = DataStorage()
             # Test connection
+
             try:
                 self.session.get(self.url)
             except requests.ConnectionError:
+
                 try:
                     self.url = self.url.replace("https://", "http://") # Change to HTTP if HTTPs unsupported
                 except requests.ConnectionError:
                     self.url = self.url.replace("http://", "https://")  # Change to HTTPs if HTTP unsupported
                 except Exception as e:
                     print("[ERROR] Something went establishing HTTP session. Error: ", e)
+
             try:  # Tries to read an exiting error file, create one is none is found.
                 self.err_file = open('err_file.log', 'a')
-                self.err_file.write("Error File\n")  # check if file is empty before writing
+                if os.stat('err_file.log').st_size == 0:
+                    self.err_file.write("Error File\n")  # check if file is empty before writing
             except Exception:
                 print("Something went wrong when opening the Error File")
                 self.session.close()
                 quit()
+
             try:  # Try to read an existing link Ignore file, create one if none is found.
                 self.ignored_links = open(ignored_links_path + '/linkignore.log', 'a')
-                self.ignored_links.write("www.exampleurl.com") # check if file is empty before writing
+                if os.stat(ignored_links_path + '/linkignore.log').st_size == 0:
+                    self.ignored_links.write("www.exampleurl.com") # check if file is empty before writing
             except Exception as e:
                 print("Something went wrong when opening the Ignored Links file. Please check Error File")
                 print("\n[ERROR] Something went opening the Ignored Links file. Error: ", e,
@@ -346,6 +354,7 @@ class ScanConfigParameters:
                 print("[Error Info] URL:", self.url, file=self.err_file)
                 self.session.close()
                 quit()
+
         except Exception as e:
             print("Something went wrong. Please check error file", e)
             print("\n[ERROR] Something went wrong when initializing tests. Error: ", e, file=self.err_file)  # Write
@@ -355,28 +364,35 @@ class ScanConfigParameters:
 
 
 class Utilities(ScanConfigParameters):
+
     def __init__(self, url, ignored_links_path):  # Inherits Parameters from Config Class
         ScanConfigParameters.__init__(self, url, ignored_links_path)
 
     def spider(self, url):
+
         try:
             global firstCallSpider
+
             if firstCallSpider:
                 response = self.session.get(self.url)  # Gets Response of URL.
             else:
                 response = self.session.get(url)  # Gets Response of URL.
+
             if response.status_code == 200:  # If 200, then endpoint is accessible
                 soup = BeautifulSoup(response.text, "html.parser")
+
                 for link in soup.find_all('a'):  # Build up URls
                     href = link.get('href')
                     if href and not href.startswith('#'):
                         extracted_url = urllib.parse.urljoin(url, href)
+
                         if re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", extracted_url).group(1) == re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", self.url).group(1):
                             if extracted_url not in self.DataStorage.urls:
                                 self.DataStorage.urls.append(extracted_url)
                                 self.spider(extracted_url)
                         else: # build additional interesting URL from different domains list 1 step
                             self.DataStorage.related_domains.append(extracted_url)
+
             if response.status_code != 200 and response.status_code != 404 and response.status_code != 500:  # If
                 # it's not 200 and not 4XX, means that there are some ways of accessing the URL
                 # Create site map.
@@ -389,25 +405,228 @@ class Utilities(ScanConfigParameters):
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
+    def get_headers(self, url):
+
+        try:
+            return self.session.get(url).headers
+        except Exception as e:  # Refine errors
+            print("Something went wrong. Please check error file.")
+            print("\n[ERROR] Something went wrong when getting the headers. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def extract_forms(self, url):
+
+        try:
+            response = self.session.get(url)
+            response.raise_for_status()
+            parsed_html = BeautifulSoup(response.content, "html.parser")#, from_encoding="iso-8859-1")
+            return parsed_html.findAll("form")
+        except requests.HTTPError as e:
+            print("Something went wrong. A HTTP error occurred. Please check error file.")
+            print("\n[ERROR] Something went wrong when extracting forms from links. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+        except Exception as e:
+            print("Something went wrong. Please check error file.")
+            print("\n[ERROR] Something went wrong when extracting forms from links. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def submit_form(self, url, form, form_data):
+
+        try:
+            action = form.get("action")
+            method = form.get("method").upper()  # GET, POST, PUT etc..
+
+            if action.startswith('http'):
+                action_url = action
+            else:
+                action_url = urllib.parse.urljoin(url, action)
+
+            if method == 'GET':
+                response = self.session.get(action_url, params=form_data)
+            else:
+                response = self.session.post(action_url, data=form_data)
+
+            response.raise_for_status()
+            return response
+        except requests.HTTPError as e:
+            print("Something went wrong. A HTTP error occurred. Please check error file.")
+            print("\n[ERROR] Something went wrong when extracting forms from links. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when submitting the form. Error: ", e, file=self.err_file)
+            print("[Error Info] FORM:", form, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
 
 class Scanner(Utilities):  # Scanner class handles scan jobs
     def __init__(self, url, ignored_links_path):
         self.Utils = Utilities.__init__(self, url, ignored_links_path)
-        self.spider(url)
+        self.spider(url) # Scan first time for URL provided by Main, then continue with others.
 
-# def extract_forms(self, url):
-    #     try:
-    #         try:
-    #             my_gui.update_list_gui("Extracting forms from application")
-    #         except Exception:
-    #             pass
-    #         response = self.session.get(url)
-    #         parsed_html = BeautifulSoup(response.content, "html.parser", from_encoding="iso-8859-1")
-    #         return parsed_html.findAll("form")
-    #     except Exception as e:
-    #         print("\n[ERROR] Something went wrong when extracting forms from links. Error: ", e, file=self.error_file)
-    #         print("[Error Info] LINK:", url, file=self.error_file)
-    #         pass
+        for url in self.DataStorage.urls:
+            self.submit_form(url, self.extract_forms(url), self.DataStorage.Payloads.SQL)
+# modify test as in above to match submit outside the test functions
+    def blind_sql(self, url, form):  # Add more payloads maybe API maybe not, maybe secondary source external files etc
+        try:
+            response_wo_payload = self.submit_form(url, form, "")  # Fix blind SQL
+
+            # global sql_injection_dict_injected, sql_injection_dict_normal # Check
+
+            normal_response_time = response_wo_payload.elapsed.total_seconds()
+
+            # sql_payload = "IF(SUBSTR(@@version,1,1)<5,BENCHMARK(2000000,SHA1(0xDE7EC71F1))," \ # Find better payloads
+            #                      "SLEEP(0.5))/*'XOR(IF(SUBSTR(@@version,1,1)<5," \
+            #                      "BENCHMARK(2000000,SHA1(0xDE7EC71F1)),SLEEP(0.5)))OR'|'XOR(IF(SUBSTR(@@version,1,1)<5," \
+            #                      "BENCHMARK(2000000,SHA1(0xDE7EC71F1)),SLEEP(0.5)))OR'*/"
+
+            # response_w_payload = self.submit_form(form, sql_payload, url)
+            # sql_response_time = response_w_payload.elapsed.total_seconds()
+
+            #if sql_response_time > normal_response_time and sql_response_time > 1:
+                # sql_injection_dict_normal[url] = normal_response_time
+                # sql_injection_dict_injected[url] = sql_response_time
+            #     return True
+            # return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
+            print("[Error Info] FORM:", form, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def test_nosql(self, form, url):  # Add more payloads
+        try:
+            try:
+                my_gui.update_list_gui("Testing for NOSQL Injection")
+            except Exception:
+                pass
+            global nosql_injection_dict_normal, nosql_injection_dict_injected
+            no_nosql_payload = ""
+            response_wh_payload = self.submit_form(form, no_nosql_payload, url)
+            normal_response_time = response_wh_payload.elapsed.total_seconds()
+            nosql_detect_payload = "';sleep(5000); ';it=new%20Date();do{pt=new%20Date();}while(pt-it<5000);"  # https://www.objectrocket.com/blog/mongodb/code-injection-in-mongodb/
+            response_w_payload = self.submit_form(form, nosql_detect_payload, url)
+            nosql_response_time = response_w_payload.elapsed.total_seconds()
+
+            if nosql_response_time > normal_response_time and nosql_response_time > 1:
+                nosql_injection_dict_normal[url] = normal_response_time
+                nosql_injection_dict_injected[url] = nosql_response_time
+                return True
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing for NOSQL Injection. Error: ", e, file=self.error_file)
+            print("[Error Info] FORM:", form, file=self.error_file)
+            print("[Error Info] LINK:", url, file=self.error_file)
+            pass
+
+    def code_exec(self, form, url):  # Add more payloads
+        try:
+            try:
+                my_gui.update_list_gui("Testing for Code Execution")
+            except Exception:
+                pass
+            code_exec_script = "| uptime"  # echo
+            response = self.submit_form(form, code_exec_script, url)
+            return re.findall('\d\d:\d\d:\d\d', str(response.content))
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e,
+                  file=self.error_file)
+            print("[Error Info] FORM:", form, file=self.error_file)
+            print("[Error Info] LINK:", url, file=self.error_file)
+            pass
+
+    def javascript_exec(self, url):  # Add more payloads
+        try:
+            try:
+                my_gui.update_list_gui("Testing for JS Code Execution")
+            except Exception:
+                pass
+            js_payload = '/?javascript:alert(testedforjavascriptcodeexecutionrn3284)'
+            if url[-1] != '/':
+                new_url = url + js_payload
+            else:
+                new_url = url + js_payload[1:]
+            response = self.session.get(new_url)
+            return 'alert(testedforjavascriptcodeexecutionrn3284)' in str(response.text).lower()
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing Javascript code execution. Error: ", e,
+                  file=self.error_file)
+            print("[Error Info] LINK:", url, file=self.error_file)
+            pass
+
+    def html_injection(self, url):  # Add more payloads
+        try:
+            try:
+                my_gui.update_list_gui("Testing for HTML Injection")
+            except Exception:
+                pass
+            html_payload = "=<img%20src='aaa'%20onerror=alert('testforhtmlinjectionra872347')>"
+            url = url.replace('=', html_payload)
+            response = self.session.get(url)
+            return 'alert(testforhtmlinjectionra872347)' in str(response.text).lower()
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing HTML Injection. Error: ", e, file=self.error_file)
+            print("[Error Info] LINK:", url, file=self.error_file)
+            pass
+
+    def ssi_injection(self, form, url):  # Add more payloads
+        try:
+            try:
+                my_gui.update_list_gui("Testing for SSI Injection")
+            except Exception:
+                pass
+            ssi_payload = '<!--#exec cmd="| uptime" -->'
+            response = self.submit_form(form, ssi_payload, url)
+            return re.findall('\d\d:\d\d:\d\d', str(response.content))
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing SSI Injection. Error: ", e, file=self.error_file)
+            print("[Error Info] FORM:", form, file=self.error_file)
+            print("[Error Info] LINK:", url, file=self.error_file)
+            pass
+
+    def host_header_injection(self, url):
+        try:
+            try:
+                my_gui.update_list_gui("Testing for HH Injection")
+            except Exception:
+                pass
+            host = {'Host': 'www.google.com'}
+            x_host = {'X-Forwarded-Host': 'www.google.com'}
+            if self.session.get(url, headers=host).status_code == 200:
+                return True
+            elif self.session.get(url, headers=x_host).status_code == 200:
+                return True
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing Host Header Injection. Error: ", e, file=self.error_file)
+            print("[Error Info] LINK:", url, file=self.error_file)
+            pass
+
+    def ssrf_injection(self, url):  # Add more payloads
+        try:
+            try:
+                my_gui.update_list_gui("Testing for SSRF Injection")
+            except Exception:
+                pass
+            ssrf_payload = "=https://www.google.com/"
+            url = url.replace('=', ssrf_payload)
+            response = self.session.get(url)
+            if response.status_code == 200:
+                return True
+            ssrf_payload = '=file:///etc/passwd'
+            url = url.replace('=', ssrf_payload)
+            if "root:" in self.get_content(url).text.lower():
+                return True
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing Server Side Request Forgery. Error: ", e,
+                  file=self.error_file)
+            print("[Error Info] LINK:", url, file=self.error_file)
+            pass
+
+
     #
     # def check_response(self, url):
     #     try:
@@ -425,30 +644,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
     #             pass
     #         return False
     #
-    # def submit_form(self, form, value, url, files=None):
-    #     try:
-    #         action = form.get("action")
-    #         post_url = urllib.parse.urljoin(url, action)
-    #         method = form.get("method")
-    #         inputs_list = form.findAll("input")
-    #         post_data_dict = {}
-    #         for inputs in inputs_list:
-    #             input_name = inputs.get("name")
-    #             input_type = inputs.get("type")
-    #             input_value = inputs.get("value")
-    #
-    #             if input_type == "text":
-    #                 input_value = value
-    #             post_data_dict[input_name] = input_value
-    #         if method.lower() == "post":
-    #             return self.session.post(post_url, files=files, data=post_data_dict)
-    #         return self.session.get(post_url, params=post_data_dict)
-    #     except Exception as e:
-    #         print("\n[ERROR] Something went wrong when submitting form. Error: ", e, file=self.error_file)
-    #         print("[Error Info] FORM:", form, file=self.error_file)
-    #         print("[Error Info] VALUE:", value, file=self.error_file)
-    #         print("[Error Info] LINK:", url, file=self.error_file)
-    #         pass
+
     #
     # def save_cookies(self, url, session=None):
     #     try:
@@ -479,11 +675,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
     #         print("[Error Info]  Hidden Path:", h_path, file=self.error_file)
     #         pass
     #
-    # def get_headers(self, url):
-    #     try:
-    #         return self.session.get(url).headers
-    #     except Exception:
-    #         pass
+
     #
     # def get_content(self, url, sess=None):
     #     try:
@@ -549,160 +741,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
 #
 #         # A1:2017-Injection
 #
-#     def test_sql(self, form, url): # Add more payloads
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for SQL Injection")
-#             except Exception:
-#                 pass
-#             global sql_injection_dict_injected, sql_injection_dict_normal
-#             sql_no_payload = ""
-#             response_wh_payload = self.submit_form(form, sql_no_payload, url)
-#             normal_response_time = response_wh_payload.elapsed.total_seconds()
-#             sql_detect_payload = "IF(SUBSTR(@@version,1,1)<5,BENCHMARK(2000000,SHA1(0xDE7EC71F1))," \
-#                                  "SLEEP(0.5))/*'XOR(IF(SUBSTR(@@version,1,1)<5," \
-#                                  "BENCHMARK(2000000,SHA1(0xDE7EC71F1)),SLEEP(0.5)))OR'|'XOR(IF(SUBSTR(@@version,1,1)<5," \
-#                                  "BENCHMARK(2000000,SHA1(0xDE7EC71F1)),SLEEP(0.5)))OR'*/"
-#             response_w_payload = self.submit_form(form, sql_detect_payload, url)
-#             sql_response_time = response_w_payload.elapsed.total_seconds()
 #
-#             if sql_response_time > normal_response_time and sql_response_time > 1:
-#                 sql_injection_dict_normal[url] = normal_response_time
-#                 sql_injection_dict_injected[url] = sql_response_time
-#                 return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.error_file)
-#             print("[Error Info] FORM:", form, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def test_nosql(self, form, url): # Add more payloads
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for NOSQL Injection")
-#             except Exception:
-#                 pass
-#             global nosql_injection_dict_normal, nosql_injection_dict_injected
-#             no_nosql_payload = ""
-#             response_wh_payload = self.submit_form(form, no_nosql_payload, url)
-#             normal_response_time = response_wh_payload.elapsed.total_seconds()
-#             nosql_detect_payload = "';sleep(5000); ';it=new%20Date();do{pt=new%20Date();}while(pt-it<5000);"  # https://www.objectrocket.com/blog/mongodb/code-injection-in-mongodb/
-#             response_w_payload = self.submit_form(form, nosql_detect_payload, url)
-#             nosql_response_time = response_w_payload.elapsed.total_seconds()
-#
-#             if nosql_response_time > normal_response_time and nosql_response_time > 1:
-#                 nosql_injection_dict_normal[url] = normal_response_time
-#                 nosql_injection_dict_injected[url] = nosql_response_time
-#                 return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing for NOSQL Injection. Error: ", e, file=self.error_file)
-#             print("[Error Info] FORM:", form, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def code_exec(self, form, url): # Add more payloads
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for Code Execution")
-#             except Exception:
-#                 pass
-#             code_exec_script = "| uptime"  # echo
-#             response = self.submit_form(form, code_exec_script, url)
-#             return re.findall('\d\d:\d\d:\d\d', str(response.content))
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.error_file)
-#             print("[Error Info] FORM:", form, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def javascript_exec(self, url): # Add more payloads
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for JS Code Execution")
-#             except Exception:
-#                 pass
-#             js_payload = '/?javascript:alert(testedforjavascriptcodeexecutionrn3284)'
-#             if url[-1] != '/':
-#                 new_url = url + js_payload
-#             else:
-#                 new_url = url + js_payload[1:]
-#             response = self.session.get(new_url)
-#             return 'alert(testedforjavascriptcodeexecutionrn3284)' in str(response.text).lower()
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Javascript code execution. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def html_injection(self, url): # Add more payloads
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for HTML Injection")
-#             except Exception:
-#                 pass
-#             html_payload = "=<img%20src='aaa'%20onerror=alert('testforhtmlinjectionra872347')>"
-#             url = url.replace('=', html_payload)
-#             response = self.session.get(url)
-#             return 'alert(testforhtmlinjectionra872347)' in str(response.text).lower()
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing HTML Injection. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def ssi_injection(self, form, url): # Add more payloads
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for SSI Injection")
-#             except Exception:
-#                 pass
-#             ssi_payload = '<!--#exec cmd="| uptime" -->'
-#             response = self.submit_form(form, ssi_payload, url)
-#             return re.findall('\d\d:\d\d:\d\d', str(response.content))
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing SSI Injection. Error: ", e, file=self.error_file)
-#             print("[Error Info] FORM:", form, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def host_header_injection(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for HH Injection")
-#             except Exception:
-#                 pass
-#             host = {'Host': 'www.google.com'}
-#             x_host = {'X-Forwarded-Host': 'www.google.com'}
-#             if self.session.get(url, headers=host).status_code == 200:
-#                 return True
-#             elif self.session.get(url, headers=x_host).status_code == 200:
-#                 return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Host Header Injection. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def ssrf_injection(self, url): # Add more payloads
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for SSRF Injection")
-#             except Exception:
-#                 pass
-#             ssrf_payload = "=https://www.google.com/"
-#             url = url.replace('=', ssrf_payload)
-#             response = self.session.get(url)
-#             if response.status_code == 200:
-#                 return True
-#             ssrf_payload = '=file:///etc/passwd'
-#             url = url.replace('=', ssrf_payload)
-#             if "root:" in self.get_content(url).text.lower():
-#                 return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Server Side Request Forgery. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
 #
 #     # A2:2017-Broken Authentication:
 #     # Above Class(LoginTestsVulns)
