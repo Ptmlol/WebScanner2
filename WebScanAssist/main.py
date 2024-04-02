@@ -1,5 +1,7 @@
 import platform
+import ssl
 import sys
+from io import UnsupportedOperation
 
 import requests
 import urllib.parse
@@ -22,6 +24,8 @@ import re
 # import subprocess
 # import shutil
 # import webbrowser
+
+firstCallSpider = 1
 
 # try:
 #     config_object = ConfigParser()
@@ -305,67 +309,93 @@ import re
 
 class DataStorage:
     def __init__(self):
-        self.url_list = []
+        self.urls = []
+        self.related_domains = []
 
 
 class ScanConfigParameters:
     def __init__(self, url, ignored_links_path):
         try:
-            try:  # Try to read an exiting error file, create one is none is found.
+            self.url = url
+            self.session = requests.Session()  # Session for current run
+            self.DataStorage = DataStorage()
+            # Test connection
+            try:
+                self.session.get(self.url)
+            except requests.ConnectionError:
+                try:
+                    self.url = self.url.replace("https://", "http://") # Change to HTTP if HTTPs unsupported
+                except requests.ConnectionError:
+                    self.url = self.url.replace("http://", "https://")  # Change to HTTPs if HTTP unsupported
+                except Exception as e:
+                    print("[ERROR] Something went establishing HTTP session. Error: ", e)
+            try:  # Tries to read an exiting error file, create one is none is found.
                 self.err_file = open('err_file.log', 'a')
-                self.err_file.write("Error File")
+                self.err_file.write("Error File\n")  # check if file is empty before writing
             except Exception:
                 print("Something went wrong when opening the Error File")
+                self.session.close()
                 quit()
             try:  # Try to read an existing link Ignore file, create one if none is found.
                 self.ignored_links = open(ignored_links_path + '/linkignore.log', 'a')
-                self.ignored_links.write("www.exampleurl.com")
+                self.ignored_links.write("www.exampleurl.com") # check if file is empty before writing
             except Exception as e:
                 print("Something went wrong when opening the Ignored Links file. Please check Error File")
                 print("\n[ERROR] Something went opening the Ignored Links file. Error: ", e,
-                      file=self.err_file)  # Write Errors to File.
+                      file=self.err_file)  # Writes Errors to File.
                 print("[Error Info] URL:", self.url, file=self.err_file)
+                self.session.close()
                 quit()
-            self.session = requests.Session()  # Session for current run
-            self.url = url
-            self.ds = DataStorage()
         except Exception as e:
-            print("Something went wrong. Please check error file")
+            print("Something went wrong. Please check error file", e)
             print("\n[ERROR] Something went wrong when initializing tests. Error: ", e, file=self.err_file)  # Write
             # Errors to File.
             print("[Error Info] URL:", self.url, file=self.err_file)
             quit()
 
 
-class Crawler(ScanConfigParameters):
-    def __init__(self, url, ignored_links_path):  # Inherit Parameters from Config Class
+class Utilities(ScanConfigParameters):
+    def __init__(self, url, ignored_links_path):  # Inherits Parameters from Config Class
         ScanConfigParameters.__init__(self, url, ignored_links_path)
 
     def spider(self, url):
         try:
-            response = self.session.get(url)  # Get Response of URL.
+            global firstCallSpider
+            if firstCallSpider:
+                response = self.session.get(self.url)  # Gets Response of URL.
+            else:
+                response = self.session.get(url)  # Gets Response of URL.
             if response.status_code == 200:  # If 200, then endpoint is accessible
                 soup = BeautifulSoup(response.text, "html.parser")
                 for link in soup.find_all('a'):  # Build up URls
                     href = link.get('href')
                     if href and not href.startswith('#'):
                         extracted_url = urllib.parse.urljoin(url, href)
-                        if extracted_url not in self.ds.url_list:
-                            self.ds.url_list.append(extracted_url)
-                            print(extracted_url)
-                            self.spider(extracted_url)
+                        if re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", extracted_url).group(1) == re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", self.url).group(1):
+                            if extracted_url not in self.DataStorage.urls:
+                                self.DataStorage.urls.append(extracted_url)
+                                self.spider(extracted_url)
+                        else: # build additional interesting URL from different domains list 1 step
+                            self.DataStorage.related_domains.append(extracted_url)
             if response.status_code != 200 and response.status_code != 404 and response.status_code != 500:  # If
                 # it's not 200 and not 4XX, means that there are some ways of accessing the URL
                 # Create site map.
-                return
+                pass
+            firstCallSpider = 0
             return
         except Exception as e:  # Add Colors to errors
-            print("Something went wrong. Please check error file")
+            print("Something went wrong. Please check error file.")
             print("\n[ERROR] Something went wrong when crawling for links. Error: ", e, file=self.err_file)
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
-    # def extract_forms(self, url):
+
+class Scanner(Utilities):  # Scanner class handles scan jobs
+    def __init__(self, url, ignored_links_path):
+        self.Utils = Utilities.__init__(self, url, ignored_links_path)
+        self.spider(url)
+
+# def extract_forms(self, url):
     #     try:
     #         try:
     #             my_gui.update_list_gui("Extracting forms from application")
@@ -2043,5 +2073,9 @@ if __name__ == '__main__':
     # ignored links file
 
     args = parser.parse_args()
-    Crawler(args.url, args.ignored_links_path).spider(args.url)
+    if re.match('^http|https?://', args.url):
+        Scanner = Scanner(args.url, args.ignored_links_path)
+    else:
+        Scanner = Scanner('http://' + args.url, args.ignored_links_path)
+
 
