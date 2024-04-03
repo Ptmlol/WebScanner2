@@ -83,7 +83,7 @@ firstCallSpider = 1
 #
 # stable_directory = os.getcwd()
 
-
+### asd
 # class OtherUser:
 #     def __init__(self, user, password, url=None, err_file=None):
 #         try:
@@ -307,12 +307,39 @@ firstCallSpider = 1
 #         except Exception:
 #             pass
 
+
 class DataStorage:
     def __init__(self):
         self.urls = []
         self.related_domains = []
+        self.sql_dict = {}
 
+    # https://github.com/payloadbox/sql-injection-payload-list
+    def payloads(self, p_type): # returns a list of payloads depending on the chosen type
+        try:
+            if p_type == 'SQL':
+                for filename in os.listdir(os.getcwd() + '/Payloads/SQL'):
+                    with open(os.path.join(os.getcwd() + '/Payloads/SQL', filename), 'r') as f:
+                        self.sql_dict[filename.split('.')[0]] = f.read().splitlines()
+                f.close()
+                all_sql_values = []
+                for value in self.sql_dict.values():
+                    if isinstance(value, list):
+                        all_sql_values.extend(value)
+                    else:
+                        all_sql_values.append(value)
+                return all_sql_values
+        except Exception as e:
+            print("\n[ERROR] Something went wrong. Payload files cannot be read", e)
+            pass
 
+    def inject_type(self, p_type):
+        for key, value in self.sql_dict.items():
+            if isinstance(value, list) and p_type in value:
+                return key
+        return None
+
+# Create login sequence for access to full application
 class ScanConfigParameters:
 
     def __init__(self, url, ignored_links_path):
@@ -321,8 +348,11 @@ class ScanConfigParameters:
             self.url = url
             self.session = requests.Session()  # Session for current run
             self.DataStorage = DataStorage()
-            # Test connection
 
+            # Create login sequence
+
+
+            # Test connection
             try:
                 self.session.get(self.url)
             except requests.ConnectionError:
@@ -464,32 +494,35 @@ class Utilities(ScanConfigParameters):
 class Scanner(Utilities):  # Scanner class handles scan jobs
     def __init__(self, url, ignored_links_path):
         self.Utils = Utilities.__init__(self, url, ignored_links_path)
-        self.spider(url) # Scan first time for URL provided by Main, then continue with others.
+        self.spider(url)  # Scan first time for URL provided by Main, then continue with others.
 
         for url in self.DataStorage.urls:
-            self.submit_form(url, self.extract_forms(url), self.DataStorage.Payloads.SQL)
-# modify test as in above to match submit outside the test functions
-    def blind_sql(self, url, form):  # Add more payloads maybe API maybe not, maybe secondary source external files etc
+            #Call all functions for tests for each URL
+            for form in self.extract_forms(url):
+                print(self.t_i_sql(url, form))
+
+    def t_i_sql(self, url, form):
         try:
-            response_wo_payload = self.submit_form(url, form, "")  # Fix blind SQL
+            # Get Initial ~ normal response time with no Payload
+            response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()
+            response_time_wo_2 = self.submit_form(url, form, "").elapsed.total_seconds()
+            response_time_wo_3 = self.submit_form(url, form, "").elapsed.total_seconds()
 
-            # global sql_injection_dict_injected, sql_injection_dict_normal # Check
+            # Create average response time
+            avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3)/3
 
-            normal_response_time = response_wo_payload.elapsed.total_seconds()
-
-            # sql_payload = "IF(SUBSTR(@@version,1,1)<5,BENCHMARK(2000000,SHA1(0xDE7EC71F1))," \ # Find better payloads
-            #                      "SLEEP(0.5))/*'XOR(IF(SUBSTR(@@version,1,1)<5," \
-            #                      "BENCHMARK(2000000,SHA1(0xDE7EC71F1)),SLEEP(0.5)))OR'|'XOR(IF(SUBSTR(@@version,1,1)<5," \
-            #                      "BENCHMARK(2000000,SHA1(0xDE7EC71F1)),SLEEP(0.5)))OR'*/"
-
-            # response_w_payload = self.submit_form(form, sql_payload, url)
-            # sql_response_time = response_w_payload.elapsed.total_seconds()
-
-            #if sql_response_time > normal_response_time and sql_response_time > 1:
-                # sql_injection_dict_normal[url] = normal_response_time
-                # sql_injection_dict_injected[url] = sql_response_time
-            #     return True
-            # return False
+            for sql_payload in self.DataStorage.payloads("SQL"):
+                response_injected = self.submit_form(url, form, sql_payload)
+                payload_response_time = response_injected.elapsed.total_seconds()
+                print("URL:", url)
+                print("Payload", sql_payload)
+                if payload_response_time > avg_response_time and payload_response_time > 1:
+                    # Vulnerable to Time based SQL type X, increase confidence - outside of this method, in the caller
+                    return True, self.DataStorage.inject_type(sql_payload)
+                if response_injected.text == "Error":  # Create other conditions of detection
+                    return True, self.DataStorage.inject_type(sql_payload)
+                # Create other conditions of detection
+            return False
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
             print("[Error Info] FORM:", form, file=self.err_file)
@@ -2116,5 +2149,4 @@ if __name__ == '__main__':
         Scanner = Scanner(args.url, args.ignored_links_path)
     else:
         Scanner = Scanner('http://' + args.url, args.ignored_links_path)
-
 
