@@ -339,7 +339,7 @@ class DataStorage:
                 return key
         return None
 
-# Create login sequence for access to full application
+
 class ScanConfigParameters:
 
     def __init__(self, url, ignored_links_path):
@@ -348,21 +348,17 @@ class ScanConfigParameters:
             self.url = url
             self.session = requests.Session()  # Session for current run
             self.DataStorage = DataStorage()
-
-            # Create login sequence
-
-
             # Test connection
             try:
                 self.session.get(self.url)
-            except requests.ConnectionError:
-
+            except requests.ConnectionError as e:
                 try:
                     self.url = self.url.replace("https://", "http://") # Change to HTTP if HTTPs unsupported
                 except requests.ConnectionError:
                     self.url = self.url.replace("http://", "https://")  # Change to HTTPs if HTTP unsupported
                 except Exception as e:
                     print("[ERROR] Something went establishing HTTP session. Error: ", e)
+                    quit()
 
             try:  # Tries to read an exiting error file, create one is none is found.
                 self.err_file = open('err_file.log', 'a')
@@ -374,9 +370,10 @@ class ScanConfigParameters:
                 quit()
 
             try:  # Try to read an existing link Ignore file, create one if none is found.
-                self.ignored_links = open(ignored_links_path + '/linkignore.log', 'a')
+                self.ignored_links = open(ignored_links_path + '/linkignore.log', 'r')
                 if os.stat(ignored_links_path + '/linkignore.log').st_size == 0:
                     self.ignored_links.write("www.exampleurl.com") # check if file is empty before writing
+                self.ignored_links = self.ignored_links.read()
             except Exception as e:
                 print("Something went wrong when opening the Ignored Links file. Please check Error File")
                 print("\n[ERROR] Something went opening the Ignored Links file. Error: ", e,
@@ -395,16 +392,38 @@ class ScanConfigParameters:
 
 class Utilities(ScanConfigParameters):
 
-    def __init__(self, url, ignored_links_path):  # Inherits Parameters from Config Class
+    def __init__(self, url, ignored_links_path,username=None, password=None):  # Inherits Parameters from Config Class
         ScanConfigParameters.__init__(self, url, ignored_links_path)
+
+        if username and password:
+            if self.login(self.session.get(self.url).url, username, password):
+                print("Login Successful")
+            else:
+                print("Login Failed. Make sure you provided the right credentials.")
+                quit()
+
+    def login(self, url, username, password):
+        login_form = self.extract_forms(url)
+        login_data = { # Extract data automatically from file
+            "login": username,
+            "password": password,
+            'form': 'submit'
+        }
+        for l_form in login_form:
+            login_response = self.submit_form(url, l_form, login_data)
+            #print(self.session.get("http://192.168.76.11/bWAPP/sqli_10-1.php").url)
+            if login_response.url != url:
+                return True
+        return False
 
     def spider(self, url):
 
         try:
             global firstCallSpider
-
             if firstCallSpider:
-                response = self.session.get(self.url)  # Gets Response of URL.
+                response = self.session.get(url)  #Gets response of user given URL (SQLi 10 -1)
+                self.DataStorage.urls.append(url)
+                firstCallSpider = 0
             else:
                 response = self.session.get(url)  # Gets Response of URL.
 
@@ -415,19 +434,17 @@ class Utilities(ScanConfigParameters):
                     href = link.get('href')
                     if href and not href.startswith('#'):
                         extracted_url = urllib.parse.urljoin(url, href)
-
+                        #ensure the app does not scan public internet/other domains
                         if re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", extracted_url).group(1) == re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", self.url).group(1):
-                            if extracted_url not in self.DataStorage.urls:
+                            if extracted_url not in self.DataStorage.urls and extracted_url not in self.ignored_links:
                                 self.DataStorage.urls.append(extracted_url)
                                 self.spider(extracted_url)
                         else: # build additional interesting URL from different domains list 1 step
                             self.DataStorage.related_domains.append(extracted_url)
-
             if response.status_code != 200 and response.status_code != 404 and response.status_code != 500:  # If
                 # it's not 200 and not 4XX, means that there are some ways of accessing the URL
                 # Create site map.
                 pass
-            firstCallSpider = 0
             return
         except Exception as e:  # Add Colors to errors
             print("Something went wrong. Please check error file.")
@@ -467,7 +484,6 @@ class Utilities(ScanConfigParameters):
         try:
             action = form.get("action")
             method = form.get("method").upper()  # GET, POST, PUT etc..
-
             if action.startswith('http'):
                 action_url = action
             else:
@@ -477,7 +493,6 @@ class Utilities(ScanConfigParameters):
                 response = self.session.get(action_url, params=form_data)
             else:
                 response = self.session.post(action_url, data=form_data)
-
             response.raise_for_status()
             return response
         except requests.HTTPError as e:
@@ -492,12 +507,14 @@ class Utilities(ScanConfigParameters):
 
 
 class Scanner(Utilities):  # Scanner class handles scan jobs
-    def __init__(self, url, ignored_links_path):
-        self.Utils = Utilities.__init__(self, url, ignored_links_path)
+    def __init__(self, url, ignored_links_path, username=None, password=None):
+        self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
         self.spider(url)  # Scan first time for URL provided by Main, then continue with others.
 
         for url in self.DataStorage.urls:
-            #Call all functions for tests for each URL
+            #Call all functions for tests for each URL. ignore links ignored in file
+            if url in self.ignored_links:
+                continue
             for form in self.extract_forms(url):
                 print(self.t_i_sql(url, form))
 
@@ -514,12 +531,17 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             for sql_payload in self.DataStorage.payloads("SQL"):
                 response_injected = self.submit_form(url, form, sql_payload)
                 payload_response_time = response_injected.elapsed.total_seconds()
-                print("URL:", url)
+                print("URL:", response_injected.url) # Actual injected is LOGIN instead of provided one
                 print("Payload", sql_payload)
-                if payload_response_time > avg_response_time and payload_response_time > 1:
+                # Detect SQL in another way, besides time ones.
+                if payload_response_time > avg_response_time and payload_response_time > 4:
                     # Vulnerable to Time based SQL type X, increase confidence - outside of this method, in the caller
+                    print("VULNERABLE")
+                    break
                     return True, self.DataStorage.inject_type(sql_payload)
-                if response_injected.text == "Error":  # Create other conditions of detection
+                if "error" in response_injected.text:  # Create other conditions of detection
+                    print("VULNERABLE")
+                    break
                     return True, self.DataStorage.inject_type(sql_payload)
                 # Create other conditions of detection
             return False
@@ -771,10 +793,6 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
     #         pass
 
 #     # Vulnerabilities
-#
-#         # A1:2017-Injection
-#
-#
 #
 #     # A2:2017-Broken Authentication:
 #     # Above Class(LoginTestsVulns)
@@ -2141,12 +2159,33 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Scan Web Application for Vulnerabilities')
     parser.add_argument("url", type=str, help="Provide an URL to scan")  # Provide argument for URL, add argument to
     # URL from ScanConfigParameters class
-    parser.add_argument("-i", "--ignored_links_path", help="Absolute Path to ignored links file", default=os.getcwd())  # Provide
+    # Provide
     # ignored links file
+    parser.add_argument("-i", "--ignored_links_path", help="Absolute Path to ignored links file", default=os.getcwd())
+    # Get Credentials for login if needed
+    parser.add_argument("-u", "--username", help="Username to login with")
+    parser.add_argument("-p", "--password", help="Password to login with")
+    parser.add_argument("-l", "--login", help="Force login to given username and password", action="store_true")
 
     args = parser.parse_args()
-    if re.match('^http|https?://', args.url):
-        Scanner = Scanner(args.url, args.ignored_links_path)
+
+    if args.login:
+        if not (args.username and args.password):
+            print("Please provide an username and a password for login!")
+            quit()
+        if re.match('^http|https?://', args.url):
+            Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password)
+        else:
+            Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password)
     else:
-        Scanner = Scanner('http://' + args.url, args.ignored_links_path)
+        if re.match('^http|https?://', args.url):
+            Scanner = Scanner(args.url, args.ignored_links_path)
+        else:
+            Scanner = Scanner('http://' + args.url, args.ignored_links_path)
+
+# TO DO:
+# Fix specific/dynamic URL search by parameter in terminal (provide specific URL, provide spidering URL, combine both with login feature)
+# Fix dynamic FORM parameters key value extraction
+# Fix vulnerability detection on injection
+
 
