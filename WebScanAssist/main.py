@@ -397,26 +397,46 @@ class Utilities(ScanConfigParameters):
 
     def do_login(self, username, password):
         if username and password:
-            if self.login(self.session.get(self.url).url, username, password):
+            if self.extract_login_form(self.session.get(self.url).url, username, password):
                 print("Login Successful")
                 return True
             else:
                 print("Login Failed. Make sure you provided the right credentials.")
                 quit()
 
-    def login(self, url, username, password):
+    def extract_login_form(self, url, username, password):
         login_form = self.extract_forms(url)
-        login_data = { # Extract data automatically from file
-            "login": username,
-            "password": password,
-            'form': 'submit'
-        }
+        # login_data = {
+        #     "login": username,
+        #     "password": password,
+        #     'form': 'submit'
+        # }
         for l_form in login_form:
-            login_response = self.submit_form(url, l_form, login_data)
-            #print(self.session.get("http://192.168.76.11/bWAPP/sqli_10-1.php").url)
+            login_data_new = self.extract_form_details(l_form)
+            for idx, (key, value) in enumerate(login_data_new.items()):
+                if login_data_new[key]:
+                    continue
+                else:
+                    if idx == 0:
+                        login_data_new[key] = username
+                    elif idx == 1:
+                        login_data_new[key] = password
+            login_response = self.submit_form(url, l_form, login_data_new)
             if login_response.url != url:
                 return True
         return False
+
+    def extract_form_details(self, form):
+        input_fields = form.find_all('input')
+        login_data = {}
+        for field in input_fields:
+            if field.get('name'):
+                login_data[field.get('name')] = field.get('value', '')
+        form_fields = form.find_all('button')
+        for field in form_fields:
+            if field.get('name'):
+                login_data[field.get('name')] = field.get('value', 'submit')
+        return login_data
 
     def spider(self, url):
 
@@ -511,7 +531,20 @@ class Utilities(ScanConfigParameters):
 class Scanner(Utilities):  # Scanner class handles scan jobs
     def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None):
         self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
+        # Build URL list
+        self.check_scan_build_url(url, username, password, static_scan)
+        self.scan()
 
+    def scan(self):
+        print(self.DataStorage.urls)
+        for url in self.DataStorage.urls:
+            # Call all functions for tests for each URL. ignore links ignored in file
+            if url in self.ignored_links:
+                continue
+            # for form in self.extract_forms(url):
+            #     print(self.t_i_sql(url, form))
+
+    def check_scan_build_url(self, url, username=None, password=None, static_scan=None):
         # Full scan required
         if static_scan is None:
             if self.session.get(url).url != url or "login" in self.session.get(url).url:
@@ -533,15 +566,6 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                     quit()
                 elif self.do_login(username, password):
                     self.DataStorage.urls = url
-        print(self.DataStorage.urls)
-
-        # print(self.DataStorage.urls)
-        for url in self.DataStorage.urls:
-            #Call all functions for tests for each URL. ignore links ignored in file
-            if url in self.ignored_links:
-                continue
-            # for form in self.extract_forms(url):
-            #     print(self.t_i_sql(url, form))
 
     def t_i_sql(self, url, form):
         try:
@@ -2191,7 +2215,6 @@ if __name__ == '__main__':
     parser.add_argument("-u", "--username", help="Username to login with")
     parser.add_argument("-p", "--password", help="Password to login with")
     parser.add_argument("-s", "--static_scan", help="Scan a single URL provided in the terminal", action="store_true", default=False)
-   #parser.add_argument("-d", "--dynamic_scan", help="Dynamically scans the whole WebApplication starting from the provided URL", action="store_true", default=True)
 
     args = parser.parse_args()
 
@@ -2219,7 +2242,5 @@ if __name__ == '__main__':
                 Scanner = Scanner('http://' + args.url, args.ignored_links_path)
 
 # TO DO:
-# Fix dynamic FORM parameters key value extraction
 # Fix vulnerability detection on injection
-# Test
 
