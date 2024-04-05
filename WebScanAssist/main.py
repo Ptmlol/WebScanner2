@@ -529,14 +529,15 @@ class Utilities(ScanConfigParameters):
 
 
 class Scanner(Utilities):  # Scanner class handles scan jobs
-    def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None):
+    def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None, comprehensive_scan=None):
         self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
         # Build URL list
+        self.comprehensive_scan = comprehensive_scan
+        print(self.comprehensive_scan)
         self.check_scan_build_url(url, username, password, static_scan)
         self.scan()
 
     def scan(self):
-
         #print(self.DataStorage.urls)
         for url in self.DataStorage.urls:
             # Call all functions for tests for each URL. ignore links ignored in file
@@ -544,9 +545,14 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                 continue
             for form in self.extract_forms(url):
                 form_data = self.extract_form_details(form)
+                # Ignore page default forms
                 if any([True for key, value in form_data.items() if key == 'form_security_level' or key =='form_bug']):
                     continue
-                print(self.t_i_sql(url, form, form_data))
+                sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data)
+                if sql_vuln:
+                    print("URL: ", url, "\nFORM: ", form, "\nVulnerability: ", sql_type, "Confidence", sql_conf)
+                    if sql_conf == 10:
+                        print("Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for comprehensive scan")
 
     def check_scan_build_url(self, url, username=None, password=None, static_scan=None):
         # Full scan required
@@ -573,6 +579,9 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
 
     def t_i_sql(self, url, form, form_data):
         try:
+            # Initialize default Confidence for forms/URLs and SQL types list
+            confidence = 0
+            sql_type_list = set()
             # Get Initial ~ normal response time with no Payload
             response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()
             response_time_wo_2 = self.submit_form(url, form, "").elapsed.total_seconds()
@@ -588,25 +597,33 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                     else:
                         payload_key = key
 
-                form_data[payload_key] = sql_payload # Risk to be referenced before being initialized
+                form_data[payload_key] = sql_payload
                 response_injected = self.submit_form(url, form, form_data)
                 payload_response_time = response_injected.elapsed.total_seconds()
-                # Detect SQL in another way, besides time ones.
+
                 if payload_response_time > avg_response_time and payload_response_time > 4:
-                    # Vulnerable to Time based SQL type X, increase confidence - outside of this method, in the caller
-                    print("VULNERABLE TIME BASED")
-                    print("URL:", response_injected.url)  # Actual injected URL
-                    print("Payload", sql_payload)
+                    # Vulnerable to Time based SQL type X, increase confidence
+                    confidence += 1
+                    sql_type_list.add(self.DataStorage.inject_type(sql_payload))
                     continue
-                    #return True, self.DataStorage.inject_type(sql_payload)
-                #print(response_injected.text)
-                # if "error" in response_injected.text:  # Create other conditions of detection
-                #     print("VULNERABLE")
-                #     print("URL:", response_injected.url)  # Actual injected URL
-                #     print("Payload", sql_payload)
-                    #return True, self.DataStorage.inject_type(sql_payload)
-                # Create other conditions of detection
-            return False
+
+                if "error" in response_injected.text:  # Create other conditions of detection
+                    confidence += 1
+                    sql_type_list.add(self.DataStorage.inject_type(sql_payload))
+                if confidence == 10:
+                    if self.comprehensive_scan is False:
+                        return True, sql_type_list, confidence
+                    else:
+                        pass
+            # Code unreachable wtf
+            print(confidence)
+            if confidence != 0:
+                print("HERE")
+                print(sql_type_list, confidence)
+                return True, sql_type_list, confidence
+            else:
+                print("ELSEWHERE")
+                return False, sql_type_list, confidence
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
             print("[Error Info] FORM:", form, file=self.err_file)
@@ -2228,32 +2245,33 @@ if __name__ == '__main__':
     parser.add_argument("-u", "--username", help="Username to login with")
     parser.add_argument("-p", "--password", help="Password to login with")
     parser.add_argument("-s", "--static_scan", help="Scan a single URL provided in the terminal", action="store_true", default=False)
+    parser.add_argument("-c", "--comprehensive_scan", help="Scan the application against all vulnerability tests available", action="store_true", default=False)
 
     args = parser.parse_args()
 
     if args.username and args.password:
         if args.static_scan:
             if re.match('^http|https?://', args.url):
-                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password, static_scan=args.static_scan)
+                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
             else:
-                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password, static_scan=args.static_scan)
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
         else:
             if re.match('^http|https?://', args.url):
-                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password)
+                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password, comprehensive_scan=args.comprehensive_scan)
             else:
-                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password)
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password, comprehensive_scan=args.comprehensive_scan)
     elif not (args.username and args.password):
         if args.static_scan:
             if re.match('^http|https?://', args.url):
-                Scanner = Scanner(args.url, args.ignored_links_path, static_scan=args.static_scan)
+                Scanner = Scanner(args.url, args.ignored_links_path, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
             else:
-                Scanner = Scanner('http://' + args.url, args.ignored_links_path, static_scan=args.static_scan)
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
         else:
             if re.match('^http|https?://', args.url):
-                Scanner = Scanner(args.url, args.ignored_links_path)
+                Scanner = Scanner(args.url, args.ignored_links_path, comprehensive_scan=args.comprehensive_scan)
             else:
-                Scanner = Scanner('http://' + args.url, args.ignored_links_path)
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, comprehensive_scan=args.comprehensive_scan)
 
 # TO DO:
-# Fix vulnerability detection on injection
+# Do injection on options key from form as well. modify with try and except.
 
