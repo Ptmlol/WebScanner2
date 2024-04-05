@@ -428,15 +428,15 @@ class Utilities(ScanConfigParameters):
 
     def extract_form_details(self, form):
         input_fields = form.find_all('input')
-        login_data = {}
+        form_data = {}
         for field in input_fields:
             if field.get('name'):
-                login_data[field.get('name')] = field.get('value', '')
+                form_data[field.get('name')] = field.get('value', '')
         form_fields = form.find_all('button')
         for field in form_fields:
             if field.get('name'):
-                login_data[field.get('name')] = field.get('value', 'submit')
-        return login_data
+                form_data[field.get('name')] = field.get('value', 'submit')
+        return form_data
 
     def spider(self, url):
 
@@ -536,13 +536,17 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
         self.scan()
 
     def scan(self):
-        print(self.DataStorage.urls)
+
+        #print(self.DataStorage.urls)
         for url in self.DataStorage.urls:
             # Call all functions for tests for each URL. ignore links ignored in file
             if url in self.ignored_links:
                 continue
-            # for form in self.extract_forms(url):
-            #     print(self.t_i_sql(url, form))
+            for form in self.extract_forms(url):
+                form_data = self.extract_form_details(form)
+                if any([True for key, value in form_data.items() if key == 'form_security_level' or key =='form_bug']):
+                    continue
+                print(self.t_i_sql(url, form, form_data))
 
     def check_scan_build_url(self, url, username=None, password=None, static_scan=None):
         # Full scan required
@@ -565,9 +569,9 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                     print("You need to provide login credentials first, check --help for details!")
                     quit()
                 elif self.do_login(username, password):
-                    self.DataStorage.urls = url
+                    self.DataStorage.urls.append(url)
 
-    def t_i_sql(self, url, form):
+    def t_i_sql(self, url, form, form_data):
         try:
             # Get Initial ~ normal response time with no Payload
             response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()
@@ -576,22 +580,31 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
 
             # Create average response time
             avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3)/3
-
+            payload_key = [elem for elem in form_data.values()][0]
             for sql_payload in self.DataStorage.payloads("SQL"):
-                response_injected = self.submit_form(url, form, sql_payload)
+                for key, value in form_data.items():
+                    if form_data[key]:
+                        continue
+                    else:
+                        payload_key = key
+
+                form_data[payload_key] = sql_payload # Risk to be referenced before being initialized
+                response_injected = self.submit_form(url, form, form_data)
                 payload_response_time = response_injected.elapsed.total_seconds()
-                print("URL:", response_injected.url) # Actual injected is LOGIN instead of provided one
-                print("Payload", sql_payload)
                 # Detect SQL in another way, besides time ones.
                 if payload_response_time > avg_response_time and payload_response_time > 4:
                     # Vulnerable to Time based SQL type X, increase confidence - outside of this method, in the caller
-                    print("VULNERABLE")
-                    break
-                    return True, self.DataStorage.inject_type(sql_payload)
-                if "error" in response_injected.text:  # Create other conditions of detection
-                    print("VULNERABLE")
-                    break
-                    return True, self.DataStorage.inject_type(sql_payload)
+                    print("VULNERABLE TIME BASED")
+                    print("URL:", response_injected.url)  # Actual injected URL
+                    print("Payload", sql_payload)
+                    continue
+                    #return True, self.DataStorage.inject_type(sql_payload)
+                #print(response_injected.text)
+                # if "error" in response_injected.text:  # Create other conditions of detection
+                #     print("VULNERABLE")
+                #     print("URL:", response_injected.url)  # Actual injected URL
+                #     print("Payload", sql_payload)
+                    #return True, self.DataStorage.inject_type(sql_payload)
                 # Create other conditions of detection
             return False
         except Exception as e:
