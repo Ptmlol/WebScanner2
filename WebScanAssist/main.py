@@ -392,12 +392,14 @@ class ScanConfigParameters:
 
 class Utilities(ScanConfigParameters):
 
-    def __init__(self, url, ignored_links_path,username=None, password=None):  # Inherits Parameters from Config Class
+    def __init__(self, url, ignored_links_path, username=None, password=None):  # Inherits Parameters from Config Class
         ScanConfigParameters.__init__(self, url, ignored_links_path)
 
+    def do_login(self, username, password):
         if username and password:
             if self.login(self.session.get(self.url).url, username, password):
                 print("Login Successful")
+                return True
             else:
                 print("Login Failed. Make sure you provided the right credentials.")
                 quit()
@@ -507,16 +509,39 @@ class Utilities(ScanConfigParameters):
 
 
 class Scanner(Utilities):  # Scanner class handles scan jobs
-    def __init__(self, url, ignored_links_path, username=None, password=None):
+    def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None):
         self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
-        self.spider(url)  # Scan first time for URL provided by Main, then continue with others.
 
+        # Full scan required
+        if static_scan is None:
+            if self.session.get(url).url != url or "login" in self.session.get(url).url:
+                # if username or password not provided, throw eer
+                if not (username and password):
+                    print("You need to provide login credentials first, check --help for details!")
+                    quit()
+                elif self.do_login(username, password):
+                    self.spider(url)  # Scan first time for URL provided by Main, then continue with others.
+            else:
+                self.spider(url)
+
+        # Static Scan required
+        else:
+            if self.session.get(url).url != url or "login" in self.session.get(url).url:
+                # if username or password not provided, throw eer
+                if not (username and password):
+                    print("You need to provide login credentials first, check --help for details!")
+                    quit()
+                elif self.do_login(username, password):
+                    self.DataStorage.urls = url
+        print(self.DataStorage.urls)
+
+        # print(self.DataStorage.urls)
         for url in self.DataStorage.urls:
             #Call all functions for tests for each URL. ignore links ignored in file
             if url in self.ignored_links:
                 continue
-            for form in self.extract_forms(url):
-                print(self.t_i_sql(url, form))
+            # for form in self.extract_forms(url):
+            #     print(self.t_i_sql(url, form))
 
     def t_i_sql(self, url, form):
         try:
@@ -2165,26 +2190,35 @@ if __name__ == '__main__':
     # Get Credentials for login if needed
     parser.add_argument("-u", "--username", help="Username to login with")
     parser.add_argument("-p", "--password", help="Password to login with")
-    parser.add_argument("-l", "--login", help="Force login to given username and password", action="store_true")
+    parser.add_argument("-s", "--static_scan", help="Scan a single URL provided in the terminal", action="store_true", default=False)
+   #parser.add_argument("-d", "--dynamic_scan", help="Dynamically scans the whole WebApplication starting from the provided URL", action="store_true", default=True)
 
     args = parser.parse_args()
 
-    if args.login:
-        if not (args.username and args.password):
-            print("Please provide an username and a password for login!")
-            quit()
-        if re.match('^http|https?://', args.url):
-            Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password)
+    if args.username and args.password:
+        if args.static_scan:
+            if re.match('^http|https?://', args.url):
+                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password, static_scan=args.static_scan)
+            else:
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password, static_scan=args.static_scan)
         else:
-            Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password)
-    else:
-        if re.match('^http|https?://', args.url):
-            Scanner = Scanner(args.url, args.ignored_links_path)
+            if re.match('^http|https?://', args.url):
+                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password)
+            else:
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password)
+    elif not (args.username and args.password):
+        if args.static_scan:
+            if re.match('^http|https?://', args.url):
+                Scanner = Scanner(args.url, args.ignored_links_path, static_scan=args.static_scan)
+            else:
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, static_scan=args.static_scan)
         else:
-            Scanner = Scanner('http://' + args.url, args.ignored_links_path)
+            if re.match('^http|https?://', args.url):
+                Scanner = Scanner(args.url, args.ignored_links_path)
+            else:
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path)
 
 # TO DO:
-# Fix specific/dynamic URL search by parameter in terminal (provide specific URL, provide spidering URL, combine both with login feature)
 # Fix dynamic FORM parameters key value extraction
 # Fix vulnerability detection on injection
 
