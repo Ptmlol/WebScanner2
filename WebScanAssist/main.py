@@ -2218,7 +2218,7 @@ if __name__ == '__main__':
             else:
                 Scanner = Scanner('http://' + args.url, args.ignored_links_path)
 
-# TO DO:
+# TO DO: cacacat
 # Fix dynamic FORM parameters key value extraction
 # Fix vulnerability detection on injection
 
