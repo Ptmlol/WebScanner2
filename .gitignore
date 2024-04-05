@@ -160,4 +160,4 @@ cython_debug/
 #.idea/
 
 # Custom Python Script
-test.py
+WebScanAssist/test.py
