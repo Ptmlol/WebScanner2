@@ -1,6 +1,7 @@
 import platform
 import ssl
 import sys
+import time
 from io import UnsupportedOperation
 
 import requests
@@ -427,18 +428,46 @@ class Utilities(ScanConfigParameters):
         return False
 
     def extract_form_details(self, form):
-        input_fields = form.find_all('input')
         form_data = {}
-        for field in input_fields:
-            if field.get('name'):
-                form_data[field.get('name')] = field.get('value', '')
-        form_fields = form.find_all('button')
-        for field in form_fields:
-            if field.get('name'):
-                form_data[field.get('name')] = field.get('value', 'submit')
+        # Extract input fields
+        try:
+            input_fields = form.find_all('input')
+            for field in input_fields:
+                if field.get('name'):
+                    form_data[field.get('name')] = field.get('value', '')
+        except Exception as e:
+            print("Exception reached in Extract Form Details", e)
+            pass
+        # Extract button fields - for action (submit, search, etc)
+        try:
+            form_fields = form.find_all('button')
+            for field in form_fields:
+                if field.get('name'):
+                    form_data[field.get('name')] = field.get('value', 'submit')
+        except Exception as e:
+            print("Exception reached in Extract Form Details", e)
+            pass
+        # Extract Select for drop-downs
+        try:
+            form_option = form.find_all('select')
+            for field in form_option:
+                if field.get('name'):
+                    form_data[field.get('name')] = ''
+        except Exception as e:
+            print("Exception reached in Extract Form Details", e)
+            pass
+        # Extract Textarea for big inputs (wall of texts)
+        try:
+            form_textarea = form.find_all('textarea')
+            for field in form_textarea:
+                if field.get('name'):
+                    form_data[field.get('name')] = ''
+        except Exception as e:
+            print("Exception reached in Extract Form Details", e)
+            pass
         return form_data
 
-    def spider(self, url):
+    def spider(self, url): # Might need to add timeout = 300
 
         try:
             global firstCallSpider
@@ -487,7 +516,7 @@ class Utilities(ScanConfigParameters):
     def extract_forms(self, url):
 
         try:
-            response = self.session.get(url)
+            response = self.session.get(url, timeout=300)
             response.raise_for_status()
             parsed_html = BeautifulSoup(response.content, "html.parser")#, from_encoding="iso-8859-1")
             return parsed_html.findAll("form")
@@ -512,9 +541,9 @@ class Utilities(ScanConfigParameters):
                 action_url = urllib.parse.urljoin(url, action)
 
             if method == 'GET':
-                response = self.session.get(action_url, params=form_data, timeout=25)
+                response = self.session.get(action_url, params=form_data, timeout=300)
             else:
-                response = self.session.post(action_url, data=form_data, timeout=25)
+                response = self.session.post(action_url, data=form_data, timeout=300)
             response.raise_for_status()
             return response
         except requests.HTTPError as e:
@@ -559,7 +588,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
     def check_scan_build_url(self, url, username=None, password=None, static_scan=None):
         # Full scan required
         if static_scan is None:
-            if self.session.get(url).url != url or "login" in self.session.get(url).url:
+            if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
                 # if username or password not provided, throw eer
                 if not (username and password):
                     print("You need to provide login credentials first, check --help for details!")
@@ -571,7 +600,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
 
         # Static Scan required
         else:
-            if self.session.get(url).url != url or "login" in self.session.get(url).url:
+            if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
                 # if username or password not provided, throw eer
                 if not (username and password):
                     print("You need to provide login credentials first, check --help for details!")
@@ -586,10 +615,9 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             sql_type_list = set()
             time_based = False
             # Get Initial ~ normal response time with no Payload
-            response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()
+            response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()  # Error, jumps out of function for some reason
             response_time_wo_2 = self.submit_form(url, form, "").elapsed.total_seconds()
             response_time_wo_3 = self.submit_form(url, form, "").elapsed.total_seconds()
-
             # Create average response time
             avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3)/3
             payload_key = [elem for elem in form_data.values()][0]
@@ -606,7 +634,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                 response_injected = self.submit_form(url, form, form_data)
                 payload_response_time = response_injected.elapsed.total_seconds()
 
-                if payload_response_time > avg_response_time and payload_response_time > 4 and time_based is False:
+                if payload_response_time > avg_response_time and payload_response_time > 2 and time_based is False:
                     # Vulnerable to Time based SQL type X, increase confidence
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
