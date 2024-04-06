@@ -512,9 +512,9 @@ class Utilities(ScanConfigParameters):
                 action_url = urllib.parse.urljoin(url, action)
 
             if method == 'GET':
-                response = self.session.get(action_url, params=form_data)
+                response = self.session.get(action_url, params=form_data, timeout=25)
             else:
-                response = self.session.post(action_url, data=form_data)
+                response = self.session.post(action_url, data=form_data, timeout=25)
             response.raise_for_status()
             return response
         except requests.HTTPError as e:
@@ -533,26 +533,28 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
         self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
         # Build URL list
         self.comprehensive_scan = comprehensive_scan
-        print(self.comprehensive_scan)
         self.check_scan_build_url(url, username, password, static_scan)
         self.scan()
 
     def scan(self):
-        #print(self.DataStorage.urls)
+        # Scan harvested URLs
         for url in self.DataStorage.urls:
             # Call all functions for tests for each URL. ignore links ignored in file
             if url in self.ignored_links:
                 continue
+            # Extract forms from each URL
             for form in self.extract_forms(url):
+                # For each form extract the details needed for payload submission
                 form_data = self.extract_form_details(form)
                 # Ignore page default forms
                 if any([True for key, value in form_data.items() if key == 'form_security_level' or key =='form_bug']):
                     continue
+                # Test SQL Injections and print results
                 sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data)
                 if sql_vuln:
                     print("URL: ", url, "\nFORM: ", form, "\nVulnerability: ", sql_type, "Confidence", sql_conf)
                     if sql_conf == 10:
-                        print("Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for comprehensive scan")
+                        print("Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for in-depth scan")
 
     def check_scan_build_url(self, url, username=None, password=None, static_scan=None):
         # Full scan required
@@ -582,6 +584,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             # Initialize default Confidence for forms/URLs and SQL types list
             confidence = 0
             sql_type_list = set()
+            time_based = False
             # Get Initial ~ normal response time with no Payload
             response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()
             response_time_wo_2 = self.submit_form(url, form, "").elapsed.total_seconds()
@@ -598,32 +601,30 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                         payload_key = key
 
                 form_data[payload_key] = sql_payload
+                if time_based and self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
+                    continue
                 response_injected = self.submit_form(url, form, form_data)
                 payload_response_time = response_injected.elapsed.total_seconds()
 
-                if payload_response_time > avg_response_time and payload_response_time > 4:
+                if payload_response_time > avg_response_time and payload_response_time > 4 and time_based is False:
                     # Vulnerable to Time based SQL type X, increase confidence
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
+                    time_based = True
                     continue
 
                 if "error" in response_injected.text:  # Create other conditions of detection
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
-                if confidence == 10:
-                    if self.comprehensive_scan is False:
+
+                if self.comprehensive_scan is False:
+                    if confidence == 10:
                         return True, sql_type_list, confidence
-                    else:
-                        pass
-            # Code unreachable wtf
-            print(confidence)
+
             if confidence != 0:
-                print("HERE")
-                print(sql_type_list, confidence)
                 return True, sql_type_list, confidence
-            else:
-                print("ELSEWHERE")
-                return False, sql_type_list, confidence
+            elif confidence == 0:
+                return False, [], 0
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
             print("[Error Info] FORM:", form, file=self.err_file)
