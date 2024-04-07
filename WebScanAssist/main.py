@@ -407,11 +407,6 @@ class Utilities(ScanConfigParameters):
 
     def extract_login_form(self, url, username, password):
         login_form = self.extract_forms(url)
-        # login_data = {
-        #     "login": username,
-        #     "password": password,
-        #     'form': 'submit'
-        # }
         for l_form in login_form:
             login_data_new = self.extract_form_details(l_form)
             for idx, (key, value) in enumerate(login_data_new.items()):
@@ -422,6 +417,9 @@ class Utilities(ScanConfigParameters):
                         login_data_new[key] = username
                     elif idx == 1:
                         login_data_new[key] = password
+                if key == "security_level":
+                    sec_level = input("Please provide desired security level (0. low, 1. medium, 2. high). \nOption: ")
+                    login_data_new[key] = sec_level
             login_response = self.submit_form(url, l_form, login_data_new)
             if login_response.url != url:
                 return True
@@ -632,6 +630,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                 if time_based and self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
                     continue
                 response_injected = self.submit_form(url, form, form_data)
+                print(response_injected.url)
                 payload_response_time = response_injected.elapsed.total_seconds()
 
                 if payload_response_time > avg_response_time and payload_response_time > 2 and time_based is False:
@@ -2302,5 +2301,5 @@ if __name__ == '__main__':
                 Scanner = Scanner('http://' + args.url, args.ignored_links_path, comprehensive_scan=args.comprehensive_scan)
 
 # TO DO:
-# Do injection on options key from form as well. modify with try and except.
+# Add more SQL compatible dynamic injections
 
