@@ -1,9 +1,9 @@
 import platform
+import random
 import ssl
 import sys
 import time
 from io import UnsupportedOperation
-
 import requests
 import urllib.parse
 import urllib.request
@@ -22,11 +22,13 @@ import os
 # import ctypes
 # import sys
 import re
+
 # import subprocess
 # import shutil
 # import webbrowser
 
 firstCallSpider = 1
+
 
 # try:
 #     config_object = ConfigParser()
@@ -316,7 +318,8 @@ class DataStorage:
         self.sql_dict = {}
 
     # https://github.com/payloadbox/sql-injection-payload-list
-    def payloads(self, p_type): # returns a list of payloads depending on the chosen type
+    # https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/SQL%20Injection/SQLite%20Injection.md
+    def payloads(self, p_type):  # returns a list of payloads depending on the chosen type
         try:
             if p_type == 'SQL':
                 for filename in os.listdir(os.getcwd() + '/Payloads/SQL'):
@@ -340,6 +343,48 @@ class DataStorage:
                 return key
         return None
 
+    # https://github.com/koutto/jok3r-pocs/blob/master/exploits/drupal-cve-2014-3704/exploit-drupal-cve-2014-3704.py
+    def random_agent_gen(self):
+        user_agent = [
+            'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.77.4 (KHTML, like Gecko) Version/7.0.5 Safari/537.77.4',
+            'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0',
+            'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:30.0) Gecko/20100101 Firefox/30.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:31.0) Gecko/20100101 Firefox/31.0',
+            'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 7_1_2 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D257 Safari/9537.53',
+            'Mozilla/5.0 (iPad; CPU OS 7_1_2 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D257 Safari/9537.53',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36',
+            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:31.0) Gecko/20100101 Firefox/31.0',
+            'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 Safari/537.36',
+            'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.59.10 (KHTML, like Gecko) Version/5.1.9 Safari/534.59.10',
+            'Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:31.0) Gecko/20100101 Firefox/31.0',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 7_1 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D167 Safari/9537.53',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.74.9 (KHTML, like Gecko) Version/7.0.2 Safari/537.74.9',
+            'Mozilla/5.0 (X11; Linux x86_64; rv:30.0) Gecko/20100101 Firefox/30.0',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 7_0_4 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11B554a Safari/9537.53',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.75.14 (KHTML, like Gecko) Version/7.0.3 Safari/537.75.14',
+            'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)',
+            'Mozilla/5.0 (Windows NT 5.1; rv:30.0) Gecko/20100101 Firefox/30.0',
+            'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:29.0) Gecko/20100101 Firefox/29.0',
+            'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 7_1_2 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) GSA/4.1.0.31802 Mobile/11D257 Safari/9537.53',
+            'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:30.0) Gecko/20100101 Firefox/30.0',
+            'Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/36.0.1985.125 Chrome/36.0.1985.125 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:30.0) Gecko/20100101 Firefox/30.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10) AppleWebKit/600.1.3 (KHTML, like Gecko) Version/8.0 Safari/600.1.3',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 Safari/537.36']
+
+        return random.choice(user_agent)
+
 
 class ScanConfigParameters:
 
@@ -354,7 +399,7 @@ class ScanConfigParameters:
                 self.session.get(self.url)
             except requests.ConnectionError as e:
                 try:
-                    self.url = self.url.replace("https://", "http://") # Change to HTTP if HTTPs unsupported
+                    self.url = self.url.replace("https://", "http://")  # Change to HTTP if HTTPs unsupported
                 except requests.ConnectionError:
                     self.url = self.url.replace("http://", "https://")  # Change to HTTPs if HTTP unsupported
                 except Exception as e:
@@ -373,7 +418,7 @@ class ScanConfigParameters:
             try:  # Try to read an existing link Ignore file, create one if none is found.
                 self.ignored_links = open(ignored_links_path + '/linkignore.log', 'r')
                 if os.stat(ignored_links_path + '/linkignore.log').st_size == 0:
-                    self.ignored_links.write("www.exampleurl.com") # check if file is empty before writing
+                    self.ignored_links.write("www.exampleurl.com")  # check if file is empty before writing
                 self.ignored_links = self.ignored_links.read()
             except Exception as e:
                 print("Something went wrong when opening the Ignored Links file. Please check Error File")
@@ -418,12 +463,19 @@ class Utilities(ScanConfigParameters):
                     elif idx == 1:
                         login_data_new[key] = password
                 if key == "security_level":
-                    sec_level = input("Please provide desired security level (0. low, 1. medium, 2. high). \nOption: ")
-                    login_data_new[key] = sec_level
+                    sec_level = str(input("Please provide desired security level (0. low, 1. medium, 2. high). \nOption: "))
+                    if self.check_sec_input(sec_level):
+                        login_data_new[key] = sec_level
             login_response = self.submit_form(url, l_form, login_data_new)
             if login_response.url != url:
                 return True
         return False
+
+    def check_sec_input(self, sec_level):
+        if str(sec_level) != '0' and str(sec_level) != '1' and str(sec_level) != '2':
+            sec_level = str(input("Please provide choose a valid option (0. low, 1. medium, 2. high)! \nOption: "))
+            self.check_sec_input(sec_level)
+        return sec_level
 
     def extract_form_details(self, form):
         form_data = {}
@@ -465,12 +517,12 @@ class Utilities(ScanConfigParameters):
             pass
         return form_data
 
-    def spider(self, url): # Might need to add timeout = 300
+    def spider(self, url):  # Might need to add timeout = 300
 
         try:
             global firstCallSpider
             if firstCallSpider:
-                response = self.session.get(url)  #Gets response of user given URL (SQLi 10 -1)
+                response = self.session.get(url)  # Gets response of user given URL (SQLi 10 -1)
                 self.DataStorage.urls.append(url)
                 firstCallSpider = 0
             else:
@@ -483,12 +535,14 @@ class Utilities(ScanConfigParameters):
                     href = link.get('href')
                     if href and not href.startswith('#'):
                         extracted_url = urllib.parse.urljoin(url, href)
-                        #ensure the app does not scan public internet/other domains
-                        if re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", extracted_url).group(1) == re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", self.url).group(1):
+                        # ensure the app does not scan public internet/other domains
+                        if re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", extracted_url).group(
+                                1) == re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)",
+                                                self.url).group(1):
                             if extracted_url not in self.DataStorage.urls and extracted_url not in self.ignored_links:
                                 self.DataStorage.urls.append(extracted_url)
                                 self.spider(extracted_url)
-                        else: # build additional interesting URL from different domains list 1 step
+                        else:  # build additional interesting URL from different domains list 1 step
                             self.DataStorage.related_domains.append(extracted_url)
             if response.status_code != 200 and response.status_code != 404 and response.status_code != 500:  # If
                 # it's not 200 and not 4XX, means that there are some ways of accessing the URL
@@ -516,7 +570,7 @@ class Utilities(ScanConfigParameters):
         try:
             response = self.session.get(url, timeout=300)
             response.raise_for_status()
-            parsed_html = BeautifulSoup(response.content, "html.parser")#, from_encoding="iso-8859-1")
+            parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
             return parsed_html.findAll("form")
         except requests.HTTPError as e:
             print("Something went wrong. A HTTP error occurred. Please check error file.")
@@ -533,6 +587,7 @@ class Utilities(ScanConfigParameters):
         try:
             action = form.get("action")
             method = form.get("method").upper()  # GET, POST, PUT etc..
+
             if action.startswith('http'):
                 action_url = action
             else:
@@ -554,9 +609,13 @@ class Utilities(ScanConfigParameters):
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
+    def custom_user_agent(self, user_agent):
+        return {'User-Agent': "Scanner Agent'" + user_agent}
+
 
 class Scanner(Utilities):  # Scanner class handles scan jobs
-    def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None, comprehensive_scan=None):
+    def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None,
+                 comprehensive_scan=None):
         self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
         # Build URL list
         self.comprehensive_scan = comprehensive_scan
@@ -574,14 +633,17 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                 # For each form extract the details needed for payload submission
                 form_data = self.extract_form_details(form)
                 # Ignore page default forms
-                if any([True for key, value in form_data.items() if key == 'form_security_level' or key =='form_bug']):
+                if any([True for key, value in form_data.items() if key == 'form_security_level' or key == 'form_bug']):
                     continue
                 # Test SQL Injections and print results
                 sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data)
                 if sql_vuln:
                     print("URL: ", url, "\nFORM: ", form, "\nVulnerability: ", sql_type, "Confidence", sql_conf)
                     if sql_conf == 10:
-                        print("Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for in-depth scan")
+                        print(
+                            "Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for in-depth scan")
+            if self.t_ua_sql(url):
+                print("URL: ", url, "\nVulnerability: ", "SQL User Agent Injection")
 
     def check_scan_build_url(self, url, username=None, password=None, static_scan=None):
         # Full scan required
@@ -606,6 +668,20 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                 elif self.do_login(username, password):
                     self.DataStorage.urls.append(url)
 
+    def t_ua_sql(self, url):
+        # Get Initial ~ normal response time with no Payload
+        response_time_wo = self.session.get(url, timeout=300).elapsed.total_seconds()
+        time_based = False
+        for sql_payload in self.DataStorage.payloads("SQL"):
+            headers = self.custom_user_agent(sql_payload)
+            response = self.session.get(url, timeout=300, headers=headers)
+            if time_based is False and response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
+                time_based = True
+                continue
+            if "error" in response.text.lower():  # Create other conditions of detection
+                return True
+        return False
+
     def t_i_sql(self, url, form, form_data):
         try:
             # Initialize default Confidence for forms/URLs and SQL types list
@@ -613,11 +689,11 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             sql_type_list = set()
             time_based = False
             # Get Initial ~ normal response time with no Payload
-            response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()  # Error, jumps out of function for some reason
+            response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()
             response_time_wo_2 = self.submit_form(url, form, "").elapsed.total_seconds()
             response_time_wo_3 = self.submit_form(url, form, "").elapsed.total_seconds()
             # Create average response time
-            avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3)/3
+            avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3) / 3
             payload_key = [elem for elem in form_data.values()][0]
             for sql_payload in self.DataStorage.payloads("SQL"):
                 for key, value in form_data.items():
@@ -625,12 +701,11 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                         continue
                     else:
                         payload_key = key
-
+                # Find the parameter where to add the SQL Payload
                 form_data[payload_key] = sql_payload
                 if time_based and self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
                     continue
                 response_injected = self.submit_form(url, form, form_data)
-                print(response_injected.url)
                 payload_response_time = response_injected.elapsed.total_seconds()
 
                 if payload_response_time > avg_response_time and payload_response_time > 2 and time_based is False:
@@ -640,7 +715,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                     time_based = True
                     continue
 
-                if "error" in response_injected.text:  # Create other conditions of detection
+                if "error" in response_injected.text.lower():  # Create other conditions of detection
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
 
@@ -788,7 +863,6 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
-
     #
     # def check_response(self, url):
     #     try:
@@ -898,6 +972,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
     #         print("\n[ERROR] Something went wrong when trying to get comments from DOM. Error: ", e, file=self.error_file)
     #         print("[Error Info] LINK:", url, file=self.error_file)
     #         pass
+
 
 #     # Vulnerabilities
 #
@@ -2272,34 +2347,45 @@ if __name__ == '__main__':
     # Get Credentials for login if needed
     parser.add_argument("-u", "--username", help="Username to login with")
     parser.add_argument("-p", "--password", help="Password to login with")
-    parser.add_argument("-s", "--static_scan", help="Scan a single URL provided in the terminal", action="store_true", default=False)
-    parser.add_argument("-c", "--comprehensive_scan", help="Scan the application against all vulnerability tests available", action="store_true", default=False)
+    parser.add_argument("-s", "--static_scan", help="Scan a single URL provided in the terminal", action="store_true",
+                        default=False)
+    parser.add_argument("-c", "--comprehensive_scan",
+                        help="Scan the application against all vulnerability tests available", action="store_true",
+                        default=False)
 
     args = parser.parse_args()
 
     if args.username and args.password:
         if args.static_scan:
             if re.match('^http|https?://', args.url):
-                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
+                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password,
+                                  static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
             else:
-                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password,
+                                  static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
         else:
             if re.match('^http|https?://', args.url):
-                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password, comprehensive_scan=args.comprehensive_scan)
+                Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password,
+                                  comprehensive_scan=args.comprehensive_scan)
             else:
-                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password, comprehensive_scan=args.comprehensive_scan)
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password,
+                                  comprehensive_scan=args.comprehensive_scan)
     elif not (args.username and args.password):
         if args.static_scan:
             if re.match('^http|https?://', args.url):
-                Scanner = Scanner(args.url, args.ignored_links_path, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
+                Scanner = Scanner(args.url, args.ignored_links_path, static_scan=args.static_scan,
+                                  comprehensive_scan=args.comprehensive_scan)
             else:
-                Scanner = Scanner('http://' + args.url, args.ignored_links_path, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path, static_scan=args.static_scan,
+                                  comprehensive_scan=args.comprehensive_scan)
         else:
             if re.match('^http|https?://', args.url):
                 Scanner = Scanner(args.url, args.ignored_links_path, comprehensive_scan=args.comprehensive_scan)
             else:
-                Scanner = Scanner('http://' + args.url, args.ignored_links_path, comprehensive_scan=args.comprehensive_scan)
+                Scanner = Scanner('http://' + args.url, args.ignored_links_path,
+                                  comprehensive_scan=args.comprehensive_scan)
 
 # TO DO:
-# Add more SQL compatible dynamic injections
+# Add remaining SQLs
+# Add other injections from the list
 
