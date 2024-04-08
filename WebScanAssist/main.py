@@ -612,6 +612,16 @@ class Utilities(ScanConfigParameters):
     def custom_user_agent(self, user_agent):
         return {'User-Agent': "Scanner Agent'" + user_agent}
 
+    def get_injection_fields_from_form(self, form_data):
+        keys_to_populate = []
+        print(form_data) # find way to store the location of the populated fields, on 1 call only
+        for key, value in form_data.items():
+            if form_data[key]:
+                continue
+            else:
+                keys_to_populate.append(key)
+        return keys_to_populate
+
 
 class Scanner(Utilities):  # Scanner class handles scan jobs
     def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None,
@@ -694,15 +704,15 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             response_time_wo_3 = self.submit_form(url, form, "").elapsed.total_seconds()
             # Create average response time
             avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3) / 3
-            payload_key = [elem for elem in form_data.values()][0]
+
+            # Find the injection points for the SQL Payload
+            injection_keys = self.get_injection_fields_from_form(form_data)
+
             for sql_payload in self.DataStorage.payloads("SQL"):
-                for key, value in form_data.items():
-                    if form_data[key]:
-                        continue
-                    else:
-                        payload_key = key
-                # Find the parameter where to add the SQL Payload
-                form_data[payload_key] = sql_payload
+
+                # Populate injection keys with payloads.
+                for injection_key in injection_keys:
+                    form_data[injection_key] = sql_payload
                 if time_based and self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
                     continue
                 response_injected = self.submit_form(url, form, form_data)
@@ -731,6 +741,30 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
             print("[Error Info] FORM:", form, file=self.err_file)
             print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def html_injection(self, url, form, form_data):
+        try:
+            payload_key = [elem for elem in form_data.values()][0]
+            for key, value in form_data.items():
+                if form_data[key]:
+                    continue
+                else:
+                    payload_key = key
+            for html_payload in self.DataStorage.payloads("HTML"):
+                for key, value in form_data.items():
+                    if form_data[key]:
+                        continue
+                    else:
+                        payload_key = key
+                # Find the parameter where to add the SQL Payload
+                form_data[payload_key] = sql_payload
+                url = url.replace('=', html_payload)
+                response = self.session.get(url)
+                return 'alert(testforhtmlinjectionra872347)' in str(response.text).lower()
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing HTML Injection. Error: ", e, file=self.error_file)
+            print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
     def test_nosql(self, form, url):  # Add more payloads
@@ -790,21 +824,6 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing Javascript code execution. Error: ", e,
                   file=self.error_file)
-            print("[Error Info] LINK:", url, file=self.error_file)
-            pass
-
-    def html_injection(self, url):  # Add more payloads
-        try:
-            try:
-                my_gui.update_list_gui("Testing for HTML Injection")
-            except Exception:
-                pass
-            html_payload = "=<img%20src='aaa'%20onerror=alert('testforhtmlinjectionra872347')>"
-            url = url.replace('=', html_payload)
-            response = self.session.get(url)
-            return 'alert(testforhtmlinjectionra872347)' in str(response.text).lower()
-        except Exception as e:
-            print("\n[ERROR] Something went wrong when testing HTML Injection. Error: ", e, file=self.error_file)
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
 
