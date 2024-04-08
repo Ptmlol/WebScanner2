@@ -316,6 +316,7 @@ class DataStorage:
         self.urls = []
         self.related_domains = []
         self.sql_dict = {}
+        self.html_inj = []
 
     # https://github.com/payloadbox/sql-injection-payload-list
     # https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/SQL%20Injection/SQLite%20Injection.md
@@ -333,6 +334,13 @@ class DataStorage:
                     else:
                         all_sql_values.append(value)
                 return all_sql_values
+    # https://github.com/InfoSecWarrior/Offensive-Payloads/blob/main/Html-Injection-Payloads.txt
+            elif p_type == 'HTML':
+                for filename in os.listdir(os.getcwd() + '/Payloads/HTML'):
+                    with open(os.path.join(os.getcwd() + '/Payloads/HTML', filename), 'r') as f:
+                        self.html_inj = f.readlines()
+                f.close()
+                return self.html_inj
         except Exception as e:
             print("\n[ERROR] Something went wrong. Payload files cannot be read", e)
             pass
@@ -477,46 +485,6 @@ class Utilities(ScanConfigParameters):
             self.check_sec_input(sec_level)
         return sec_level
 
-    def extract_form_details(self, form):
-        form_data = {}
-        # Extract input fields
-        try:
-            input_fields = form.find_all('input')
-            for field in input_fields:
-                if field.get('name'):
-                    form_data[field.get('name')] = field.get('value', '')
-        except Exception as e:
-            print("Exception reached in Extract Form Details", e)
-            pass
-        # Extract button fields - for action (submit, search, etc)
-        try:
-            form_fields = form.find_all('button')
-            for field in form_fields:
-                if field.get('name'):
-                    form_data[field.get('name')] = field.get('value', 'submit')
-        except Exception as e:
-            print("Exception reached in Extract Form Details", e)
-            pass
-        # Extract Select for drop-downs
-        try:
-            form_option = form.find_all('select')
-            for field in form_option:
-                if field.get('name'):
-                    form_data[field.get('name')] = ''
-        except Exception as e:
-            print("Exception reached in Extract Form Details", e)
-            pass
-        # Extract Textarea for big inputs (wall of texts)
-        try:
-            form_textarea = form.find_all('textarea')
-            for field in form_textarea:
-                if field.get('name'):
-                    form_data[field.get('name')] = ''
-        except Exception as e:
-            print("Exception reached in Extract Form Details", e)
-            pass
-        return form_data
-
     def spider(self, url):  # Might need to add timeout = 300
 
         try:
@@ -582,6 +550,72 @@ class Utilities(ScanConfigParameters):
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
+    def extract_form_details(self, form):
+        form_data = {}
+        # Extract input fields
+        try:
+            input_fields = form.find_all('input')
+            for field in input_fields:
+                if field.get('name'):
+                    form_data[field.get('name')] = field.get('value', '')
+        except Exception as e:
+            print("Exception reached in Extract Form Details", e)
+            pass
+        # Extract button fields - for action (submit, search, etc)
+        try:
+            form_fields = form.find_all('button')
+            for field in form_fields:
+                if field.get('name'):
+                    form_data[field.get('name')] = field.get('value', 'submit')
+        except Exception as e:
+            print("Exception reached in Extract Form Details", e)
+            pass
+        # Extract Select for drop-downs
+        try:
+            form_option = form.find_all('select')
+            for field in form_option:
+                if field.get('name'):
+                    form_data[field.get('name')] = ''
+        except Exception as e:
+            print("Exception reached in Extract Form Details", e)
+            pass
+        # Extract Textarea for big inputs (wall of texts)
+        try:
+            form_textarea = form.find_all('textarea')
+            for field in form_textarea:
+                if field.get('name'):
+                    form_data[field.get('name')] = ''
+        except Exception as e:
+            print("Exception reached in Extract Form Details", e)
+            pass
+        return form_data
+
+    def extract_iframes(self, url):
+        try:
+            response = self.session.get(url, timeout=300)
+            response.raise_for_status()
+            parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
+            return parsed_html.findAll("iframe")
+        except requests.HTTPError as e:
+            print("Something went wrong. A HTTP error occurred. Please check error file.")
+            print("\n[ERROR] Something went wrong when extracting iframes from links. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+        except Exception as e:
+            print("Something went wrong. Please check error file.")
+            print("\n[ERROR] Something went wrong when extracting iframes from links. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def build_iframe_url(self, url, iframe, payload):
+        try:
+            if iframe['src'] in url:
+                url = url.replace(iframe['src'], payload)
+                return url
+            return None
+        except Exception as e:
+            print("Exception reached in Extract iFrame Details", e)
+            pass
+
     def submit_form(self, url, form, form_data):
 
         try:
@@ -614,7 +648,6 @@ class Utilities(ScanConfigParameters):
 
     def get_injection_fields_from_form(self, form_data):
         keys_to_populate = []
-        print(form_data) # find way to store the location of the populated fields, on 1 call only
         for key, value in form_data.items():
             if form_data[key]:
                 continue
@@ -645,15 +678,12 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                 # Ignore page default forms
                 if any([True for key, value in form_data.items() if key == 'form_security_level' or key == 'form_bug']):
                     continue
-                # Test SQL Injections and print results
-                sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data)
-                if sql_vuln:
-                    print("URL: ", url, "\nFORM: ", form, "\nVulnerability: ", sql_type, "Confidence", sql_conf)
-                    if sql_conf == 10:
-                        print(
-                            "Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for in-depth scan")
-            if self.t_ua_sql(url):
-                print("URL: ", url, "\nVulnerability: ", "SQL User Agent Injection")
+
+                #self.scan_sql(url, form, form_data)
+                #self.scan_html(url, form, form_data)
+            self.scan_iframe(url)
+
+        return
 
     def check_scan_build_url(self, url, username=None, password=None, static_scan=None):
         # Full scan required
@@ -689,6 +719,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                 time_based = True
                 continue
             if "error" in response.text.lower():  # Create other conditions of detection
+                print("print")
                 return True
         return False
 
@@ -707,7 +738,6 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
 
             # Find the injection points for the SQL Payload
             injection_keys = self.get_injection_fields_from_form(form_data)
-
             for sql_payload in self.DataStorage.payloads("SQL"):
 
                 # Populate injection keys with payloads.
@@ -743,29 +773,59 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
-    def html_injection(self, url, form, form_data):
+    def scan_sql(self, url, form, form_data):
+        # Test SQL Injections and print results
+        sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data)
+        if sql_vuln:
+            if sql_conf == 10:
+                print("URL: ", url, "\nFORM: ", form, "\nVulnerability: ", sql_type, "\nConfidence", sql_conf)
+                print("Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for in-depth scan")
+            else:
+                print("URL: ", url, "\nFORM: ", form, "\nVulnerability: ", sql_type, "\nConfidence", sql_conf)
+        if self.t_ua_sql(url):
+            print("URL: ", url, "\nVulnerability: SQL User Agent Injection")
+        return
+
+    def t_i_html(self, url, form, form_data):
         try:
-            payload_key = [elem for elem in form_data.values()][0]
-            for key, value in form_data.items():
-                if form_data[key]:
-                    continue
-                else:
-                    payload_key = key
+            # Select injection points from form details
+            confidence = 0
+            injection_keys = self.get_injection_fields_from_form(form_data)
             for html_payload in self.DataStorage.payloads("HTML"):
-                for key, value in form_data.items():
-                    if form_data[key]:
-                        continue
+                # Inject each payload into each injection point
+                for injection_key in injection_keys:
+                    form_data[injection_key] = html_payload
+                response_injected = self.submit_form(url, form, form_data)
+                if 'uid=13249768' in response_injected.text.lower():  # Unique identified placed by me to search for vuln
+                    if self.comprehensive_scan is False:
+                        confidence += 1
+                        return True, confidence
                     else:
-                        payload_key = key
-                # Find the parameter where to add the SQL Payload
-                form_data[payload_key] = sql_payload
-                url = url.replace('=', html_payload)
-                response = self.session.get(url)
-                return 'alert(testforhtmlinjectionra872347)' in str(response.text).lower()
+                        confidence += 1
+            if confidence > 0:
+                return True, confidence
+            return False, 0
         except Exception as e:
-            print("\n[ERROR] Something went wrong when testing HTML Injection. Error: ", e, file=self.error_file)
-            print("[Error Info] LINK:", url, file=self.error_file)
+            print("\n[ERROR] Something went wrong when testing HTML Injection. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
             pass
+
+    def scan_html(self, url, form, form_data):
+        html_vuln, confidence = self.t_i_html(url, form, form_data)
+        if html_vuln:
+            print("URL: ", url, "\nFORMs: ", form, "\nVulnerability: HTML Injection", "\nConfidence: ", confidence)
+
+    def t_i_iframe(self, url, iframe):
+        iframe_payload = 'https://www.google.com'
+        iframe_url = self.build_iframe_url(url, iframe, iframe_payload)
+        if iframe_url:
+            if iframe_payload in self.session.get(iframe_url).text.lower():
+                print("URL: ", url, "\nIFrame: ", iframe, "\nVulnerability: iFrame Injection")
+        return
+
+    def scan_iframe(self, url):
+        for iframe in self.extract_iframes(url):
+            self.t_i_iframe(url, iframe)
 
     def test_nosql(self, form, url):  # Add more payloads
         try:
@@ -1805,7 +1865,7 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
 #                 elif "=" in url:
 #                     if self.test_xss_in_link(url):
 #                         links_xss_link.append(url)
-#                     if self.html_injection(url):
+#                     if self.t_i_html(url):
 #                         links_html_injection.append(url)
 #                     if self.ssrf_injection(url):
 #                         links_ssrf_injection.append(url)
@@ -2373,7 +2433,6 @@ if __name__ == '__main__':
                         default=False)
 
     args = parser.parse_args()
-
     if args.username and args.password:
         if args.static_scan:
             if re.match('^http|https?://', args.url):
