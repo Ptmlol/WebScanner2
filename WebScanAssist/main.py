@@ -557,7 +557,7 @@ class Utilities(ScanConfigParameters):
             input_fields = form.find_all('input')
             for field in input_fields:
                 if field.get('name'):
-                    form_data[field.get('name')] = field.get('value', '')
+                    form_data[field.get('name')] = '' # might need back field.get('value', '')
         except Exception as e:
             print("Exception reached in Extract Form Details", e)
             pass
@@ -679,8 +679,12 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
                 if any([True for key, value in form_data.items() if key == 'form_security_level' or key == 'form_bug']):
                     continue
 
-                #self.scan_sql(url, form, form_data)
-                #self.scan_html(url, form, form_data)
+                # Form and URL scan
+                self.scan_html(url, form, form_data)
+                #self.scan_code_exec(url, form, form_data)
+                self.scan_sql(url, form, form_data) # Tests mess with each other
+
+             # URL only scan
             self.scan_iframe(url)
 
         return
@@ -827,6 +831,28 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
         for iframe in self.extract_iframes(url):
             self.t_i_iframe(url, iframe)
 
+    def t_i_code_exec(self, url, form, form_data):  # Add more payloads
+        try:
+            code_exec_payload = "| ping -c 3 127.0.0.1"  # Detects blind and standard Code Exec
+            injection_keys = self.get_injection_fields_from_form(form_data) # Check why it does not work together
+            for injection_key in injection_keys:
+                form_data[injection_key] = code_exec_payload
+            response = self.submit_form(url, form, form_data)
+            print(response.url)
+            print(response.elapsed.total_seconds())
+            if response.elapsed.total_seconds() > 1.5:
+                return True
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
+            print("[Error Info] FORM:", form, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def scan_code_exec(self, url, form, form_data):
+        if self.t_i_code_exec(url, form, form_data):
+            print("URL: ", url, "\nFORMs: ", form, "\nVulnerability: Code Execution")
+
     def test_nosql(self, form, url):  # Add more payloads
         try:
             try:
@@ -848,22 +874,6 @@ class Scanner(Utilities):  # Scanner class handles scan jobs
             return False
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing for NOSQL Injection. Error: ", e, file=self.error_file)
-            print("[Error Info] FORM:", form, file=self.error_file)
-            print("[Error Info] LINK:", url, file=self.error_file)
-            pass
-
-    def code_exec(self, form, url):  # Add more payloads
-        try:
-            try:
-                my_gui.update_list_gui("Testing for Code Execution")
-            except Exception:
-                pass
-            code_exec_script = "| uptime"  # echo
-            response = self.submit_form(form, code_exec_script, url)
-            return re.findall('\d\d:\d\d:\d\d', str(response.content))
-        except Exception as e:
-            print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e,
-                  file=self.error_file)
             print("[Error Info] FORM:", form, file=self.error_file)
             print("[Error Info] LINK:", url, file=self.error_file)
             pass
