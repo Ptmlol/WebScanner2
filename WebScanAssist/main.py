@@ -441,9 +441,9 @@ class ScanConfigParameters:
 
             try:
                 #  Try to read an existing link Ignore file, create one if none is found.
-                self.ignored_links = open(ignored_links_path + '/linkignore.log', 'r')
+                self.ignored_links = open(ignored_links_path + '\\linkignore.log', 'r')
                 # Check if file is empty before writing.
-                if os.stat(ignored_links_path + '/linkignore.log').st_size == 0:
+                if os.stat(ignored_links_path + '\\linkignore.log').st_size == 0:
                     self.ignored_links.write("www.exampleurl.com")
                 # Add the ignored links to a class variable
                 self.ignored_links = self.ignored_links.read()
@@ -719,6 +719,18 @@ class Utilities(ScanConfigParameters):
             print("\n[ERROR] Something went wrong when extracting the empty values from forms. Error: ", e, file=self.err_file)
             pass
 
+    def save_cookies(self, url, session=None):
+        try:
+            if session is None:
+                return self.session.cookies.get_dict()
+            else:
+                return session.cookies.get_dict()
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when saving cookies. Error: ", e, file=self.err_file)
+            pass
+
+
+
 # Scanner class handles scan jobs
 class Scanner(Utilities):
     def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None, comprehensive_scan=None):
@@ -751,6 +763,10 @@ class Scanner(Utilities):
                 # URL only scan
                 self.scan_iframe(url)
                 self.scan_php_exec(url)
+                self.scan_role_def_dir(url)
+                self.scan_role_def_cookie(url)
+                self.scan_session(url)
+                #self.scan_browser_cache(url)
             return
         except Exception as e:
             print("Something went wrong when attempting to scan. Please check error file.")
@@ -787,6 +803,8 @@ class Scanner(Utilities):
         except Exception as e:
             print("\n[ERROR] Something went wrong when checking login and scan required. Error: ", e, file=self.err_file)
             quit()
+
+    # Injections
 
     def t_ua_sql(self, url):
         try:
@@ -870,10 +888,10 @@ class Scanner(Utilities):
             sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data)
             if sql_vuln:
                 if sql_conf == 10:
-                    print("Vulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
+                    print("\nVulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
                     print("Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for in-depth scan")
                 else:
-                    print("Vulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
+                    print("\nVulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
             # Bulk up User-Agent SQL Injection detection in the same function
             if self.t_ua_sql(url):
                 print("\nVulnerability: SQL User Agent Injection", "\nURL: ", url)
@@ -916,7 +934,7 @@ class Scanner(Utilities):
             html_vuln, confidence = self.t_i_html(url, form, form_data)
             # Print if Vulnerabilities are found.
             if html_vuln:
-                print("Vulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
+                print("\nVulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
         except Exception as e:
             print("Something went wrong when testing HTML Injections. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for HTML Injection. Error: ", e, file=self.err_file)
@@ -970,7 +988,7 @@ class Scanner(Utilities):
             # Create shadow copy so variable is not modified by reference
             form_data = form_data.copy()
             if self.t_i_code_exec(url, form, form_data):
-                print("Vulnerability: Code Execution", "\nURL: ", url, "\nFORMs: ", form)
+                print("\nVulnerability: Code Execution", "\nURL: ", url, "\nFORMs: ", form)
         except Exception as e:
             print("Something went wrong when testing for Code Execution Injection. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
@@ -1001,12 +1019,12 @@ class Scanner(Utilities):
     def scan_php_exec(self, url):
         try:
             if self.t_i_php_exec(url):
-                print("Vulnerability: PHP Code Execution in URL", "\nURL: ", url)
+                print("\nVulnerability: PHP Code Execution in URL", "\nURL: ", url)
         except Exception as e:
             print("Something went wrong when testing for PHP Injection. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for PHP Code Execution Injection. Error: ", e, file=self.err_file)
             pass
-    
+
     def t_i_ssi(self, url, form, form_data):
         try:
             # Non blind detection. Search for UNIX time format in response.
@@ -1021,13 +1039,13 @@ class Scanner(Utilities):
             print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
             print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
             pass
-    
+
     def scan_ssi(self, url, form, form_data):
         try:
             # Create copy of form data.
             form_data = form_data.copy()
             if self.t_i_ssi(url, form, form_data):
-                print("Vulnerability: SSI Code Execution in URL", "\nURL: ", url, "\nFORMs: ", form)
+                print("\nVulnerability: SSI Code Execution in URL", "\nURL: ", url, "\nFORMs: ", form)
         except Exception as e:
             print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
             print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
@@ -1040,6 +1058,108 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong when testing XML Injection. Error: ", e, file=self.err_file)
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
+
+    # Broken Authentication
+
+    def t_ba_role_definition_cookie(self, url):
+        try:
+            cookie_dict = self.save_cookies(url)
+            if "isadmin" in str(cookie_dict).lower():
+                if str(cookie_dict.lower()["isAdmin"]).lower() == "true" or \
+                        str(cookie_dict.lower()["isAdministrator"]).lower() == "true" or \
+                        str(cookie_dict.lower()["admin"]).lower() == "true" or \
+                        str(cookie_dict.lower()["administrator"]).lower() == "true":
+                    return True
+            if "role" in str(cookie_dict).lower():
+                if str(cookie_dict.lower()["role"]).lower() == "admin" or \
+                        str(cookie_dict.lower()["role"]).lower() == "administrator" or \
+                        str(cookie_dict.lower()["role"]).lower() == "manager" or \
+                        str(cookie_dict.lower()["role"]).lower() == "auditor" or \
+                        str(cookie_dict.lower()["role"]).lower() == "mod":
+                    return True
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing for role definition on cookies. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def scan_role_def_cookie(self, url):
+        if self.t_ba_role_definition_cookie(url):
+            print("\nVulnerability: Administrator roles defined in Cookie! Session can be hijacked!", "\nURL: ", url)
+
+    def t_ba_role_definition_directories(self, url):
+        try:
+            link = url.lower()
+            if "admin" in link or "administrator" in link or "mod" in link or "moderator" in link:
+                return True
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing for role definition directories. Error: ", e, file=self.err_file)
+            pass
+
+    def scan_role_def_dir(self, url):
+        if self.t_ba_role_definition_directories(url):
+            print("Vulnerability: Administrator roles defined in URLs!", "\nURL: ", url)
+
+    def t_ba_session(self, url):
+        try:
+            cookie_dict = self.save_cookies(url)
+            if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(cookie_dict).lower():
+                if 'secure' not in str(cookie_dict).lower() or 'httponly' not in str(cookie_dict).lower():
+                    return True
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when checking presence of session. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def scan_session(self, url):
+        if self.t_ba_session(url):
+            print("\nVulnerability: Session not secure...(HTTP only). Session Hijacking might be possible. \nURL: ", url)
+
+    def t_ba_browser_cache_weakness(self, url):
+        try:
+            response = self.session.get(url)
+            if "Cache-Control" in str(response.headers):
+                if (response.headers["Cache-Control"] != "no-store" and response.headers["Cache-Control"] == "no-cache, must-revalidate") or\
+                        (response.headers["Cache-Control"] == "no-store" and
+                         response.headers["Cache-Control"] != "no-cache, must-revalidate"):
+                    return False
+            return True
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing browser cache. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def scan_browser_cache(self, url):
+        if self.t_ba_browser_cache_weakness(url):
+            print("Vulnerability: Potential Browser Cache Weakness vulnerability identified. \nURL: ", url)
+
+#TODO: Modify OtherUser class to enable multiple user testing, test remaning Broken Auth vulnerabilities.
+
+#     def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths
+#         try:
+#             with open(config_object["FILE"]["hidden_url_dict"], "r") as file:
+#                 paths = file.read().split("\n")
+#                 file.close()
+#             for hidden_path in paths:
+#                 if self.target_url + hidden_path not in self.visited and\
+#                         self.target_url + hidden_path not in self.ignored_links and\
+#                         self.target_url + hidden_path not in self.target_links and\
+#                         "logout" not in self.target_url + hidden_path and\
+#                         len(self.visited) <= int(config_object['TEST']['max_number_of_hidden_links']):
+#                     response = self.session.get(self.target_url + hidden_path)
+#                     if response.status_code == 200:
+#                         link_visited = self.target_url + hidden_path
+#                         self.visited.append(str(link_visited))
+#             if self.visited:
+#                 return 1
+#             return 0
+#         except Exception as e:
+#             print("\n[ERROR] Something went wrong when searching for paths. Error: ", e, file=self.error_file)
+#             pass
+#
+#
 
     # def test_nosql(self, form, url):  # Add more payloads
     #     try:
@@ -1143,19 +1263,6 @@ class Scanner(Utilities):
     #
 
     #
-    # def save_cookies(self, url, session=None):
-    #     try:
-    #         if session is None:
-    #             self.session.get(url)
-    #             session_cookies = self.session.cookies
-    #         else:
-    #             session_cookies = session.cookies
-    #         cookies_dictionary = session_cookies.get_dict()
-    #         return cookies_dictionary
-    #     except Exception as e:
-    #         print("\n[ERROR] Something went wrong when saving cookies. Error: ", e, file=self.error_file)
-    #         print("[Error Info] LINK:", url, file=self.error_file)
-    #         pass
     #
     # def check_hidden_path(self, h_path):
     #     try:
@@ -1240,133 +1347,7 @@ class Scanner(Utilities):
 #     # A2:2017-Broken Authentication:
 #     # Above Class(LoginTestsVulns)
 #
-#     def test_role_definition_cookie(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for Role Definition Cookies")
-#             except Exception:
-#                 pass
-#             cookie_dict = self.save_cookies(url)
-#             if "isadmin" in str(cookie_dict).lower():
-#                 if str(cookie_dict.lower()["isAdmin"]).lower() == "true" or\
-#                         str(cookie_dict.lower()["isAdministrator"]).lower() == "true" or\
-#                         str(cookie_dict.lower()["admin"]).lower() == "true" or\
-#                         str(cookie_dict.lower()["administrator"]).lower() == "true":
-#                     return 1
-#             if "role" in str(cookie_dict).lower():
 #
-#                 if str(cookie_dict.lower()["role"]).lower() == "admin" or\
-#                         str(cookie_dict.lower()["role"]).lower() == "administrator" or\
-#                         str(cookie_dict.lower()["role"]).lower() == "manager" or\
-#                         str(cookie_dict.lower()["role"]).lower() == "auditor" or\
-#                         str(cookie_dict.lower()["role"]).lower() == "mod":
-#                     return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing for role definition on cookies. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def search_paths(self):
-#         try:
-#             with open(config_object["FILE"]["hidden_url_dict"], "r") as file:
-#                 paths = file.read().split("\n")
-#                 file.close()
-#             for hidden_path in paths:
-#                 if self.target_url + hidden_path not in self.visited and\
-#                         self.target_url + hidden_path not in self.ignored_links and\
-#                         self.target_url + hidden_path not in self.target_links and\
-#                         "logout" not in self.target_url + hidden_path and\
-#                         len(self.visited) <= int(config_object['TEST']['max_number_of_hidden_links']):
-#                     response = self.session.get(self.target_url + hidden_path)
-#                     if response.status_code == 200:
-#                         link_visited = self.target_url + hidden_path
-#                         self.visited.append(str(link_visited))
-#             if self.visited:
-#                 return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when searching for paths. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def test_role_definition_directories(self):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for Role Definition Directories")
-#             except Exception:
-#                 pass
-#             hidden_dir = []
-#             for link in self.visited+self.target_links:
-#                 link = link.lower()
-#                 if "/admin" in link or "/administrator" in link or "/mod" in link or "/moderator" in link:
-#                     hidden_dir.append(link)
-#             if hidden_dir:
-#                 return hidden_dir
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing for role definition directories. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def check_session_url(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Checking Session URL")
-#             except Exception:
-#                 pass
-#             cookie_dict = self.save_cookies(url)
-#             if "sid=" or "sessionid=" in str(url).lower():
-#                 print("\n[?????-!!!!!]Possible SessionID Hijacking for link:" + url, file=self.report_file)
-#                 print("\nSearching for proper SessionID storage on cookies...", file=self.report_file)
-#                 if "sid" or "sessionid" or "session" or "sessiontoken" or "sessid" in str(cookie_dict).lower():
-#                     if not str(cookie_dict.lower()["secure"]) or str(cookie_dict.lower()["httpOnly"]):
-#                         print("\n[!!!-!!!]Cookie Session not secure...(HTTP only)", file=self.report_file)
-#                         return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking presence of session. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def check_session_id(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Checking Session ID")
-#             except Exception:
-#                 pass
-#             global session_id, prev_session_id
-#             if "sid=" in str(url).lower():
-#                 session_id = url.split("sid=", 1)[1]
-#             elif "sessionid=" in str(url).lower():
-#                 session_id = url.split("sessionid=", 1)[1]
-#
-#             if session_id != prev_session_id:
-#                 if self.check_session_url(url):
-#                     prev_session_id = session_id
-#                     return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking session ID. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def test_browser_cache_weakness(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for browser cache misconfiguration")
-#             except Exception:
-#                 pass
-#             response = self.session.get(url)
-#             if "Cache-Control" in str(response.headers):
-#                 if (response.headers["Cache-Control"] != "no-store" and
-#                     response.headers["Cache-Control"] == "no-cache, must-revalidate") or\
-#                         (response.headers["Cache-Control"] == "no-store" and
-#                          response.headers["Cache-Control"] != "no-cache, must-revalidate"):
-#                     return False
-#             return True
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing browser cache. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
 #
 #     # A3:2017-Sensitive Data Exposure
 #     # checking certificate...
