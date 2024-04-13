@@ -22,7 +22,7 @@ import os
 # import ctypes
 # import sys
 import re
-
+import http.cookies
 # import subprocess
 # import shutil
 # import webbrowser
@@ -85,54 +85,6 @@ firstCallSpider = 1
 # temp_dir = None
 #
 # stable_directory = os.getcwd()
-
-### asd
-# class OtherUser:
-#     def __init__(self, user, password, url=None, err_file=None):
-#         try:
-#             self.error_file = err_file
-#             self.url = url
-#             self.session = requests.Session()
-#             self.http = self.session.post(
-#                 config_object["WEBURL"]["login"],
-#                 data={
-#                     config_object["CREDENTIAL"]["username_field"]: user,
-#                     config_object["CREDENTIAL"]["password_field"]: password,
-#                     config_object["CREDENTIAL"]["login_field"]: config_object["CREDENTIAL"]["submit_field"]
-#                 }
-#             )
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when trying to establish another session. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", self.url, file=self.error_file)
-#             pass
-#
-#     def save_cookies(self, url):
-#         try:
-#             self.session.get(url)
-#             session_cookies = self.session.cookies
-#             cookies_dictionary = session_cookies.get_dict()
-#             return cookies_dictionary
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when trying to return cookies from another session. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def get_sess_id(self):
-#         try:
-#             global session_id
-#             self.session.get(self.url)
-#             cookie_dict = self.save_cookies(self.url)
-#             key_list = list(cookie_dict.keys())
-#             for key in key_list:
-#                 if key.lower() == "sid" or "sessionid" or "session" or "sessiontoken" or "sessid":
-#                     session_id = cookie_dict[key]
-#                     self.session.close()
-#                     return session_id
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when trying to get session id from another session. Error: ", e, file=self.error_file)
-#             pass
-#
 #
 # class LoginTests:
 #     def __init__(self, user, login_url, pass_file, wrong_username, good_password, certain_wrong_passwd, logout_url, file_for_report, error_file):
@@ -287,28 +239,7 @@ firstCallSpider = 1
 #             return
 #         except Exception:
 #             pass
-#
-#     def test_account_enum(self):
-#         try:
-#             if self.account_enumeration():
-#                 print(
-#                     "[!!!-!!!] It s possible that the login error message provides useful information about login credentials!"
-#                     " Make sure the error message is the same for any invalid credentials case!",  file=self.report_file
-#                 )
-#             else:
-#                 print("OK! No accounts can be enumerated", file=self.report_file)
-#             return
-#         except Exception:
-#             pass
-#
-#     def test_brute_force(self):
-#         try:
-#             if self.brute_force():
-#                 print("[!!!---!!!] Brute Force attack successful!!" + "\nUsername: " + self.username + "\n" + "Found password: " + self.password, file=self.report_file)
-#                 print("\t\t[END LOGIN REPORT]", file=self.report_file)
-#             return
-#         except Exception:
-#             pass
+
 
 
 class DataStorage:
@@ -465,12 +396,12 @@ class Utilities(ScanConfigParameters):
     def __init__(self, url, ignored_links_path, username=None, password=None):  # Inherits Parameters from Config Class
         ScanConfigParameters.__init__(self, url, ignored_links_path)
 
-    def do_login(self, username, password):
+    def process_login(self, username, password, sec_level=None):
         try:
             # Check for username and password if provided, do nothing if not provided.
             if username and password:
                 # Extract the login form information to perform login.
-                if self.extract_login_form(self.session.get(self.url).url, username, password):
+                if self.extract_do_login(self.session.get(self.url).url, username, password, sec_level):
                     print("Login Successful")
                     return True
                 else:
@@ -481,7 +412,7 @@ class Utilities(ScanConfigParameters):
             print("\n[ERROR] Something went wrong when cattempting to login. Error: ", e, file=self.err_file)
             quit()
 
-    def extract_login_form(self, url, username, password):
+    def extract_do_login(self, url, username, password, sec_level=None):
         try:
             # Treat login form as an usual form, extract it.
             login_form = self.extract_forms(url)
@@ -498,10 +429,12 @@ class Utilities(ScanConfigParameters):
                         elif idx == 1:
                             login_data_new[key] = password
                     # Check if the app requires a "security_level" - test for BWapp App.
-                    if key == "security_level":
+                    if key == "security_level" and sec_level is None:
                         sec_level = str(input("Please provide desired security level (0. low, 1. medium, 2. high). \nOption: "))
                         if self.check_sec_input(sec_level):
                             login_data_new[key] = sec_level
+                    elif key == "security_level" and sec_level:
+                        login_data_new[key] = sec_level
                 # Do login and check redirect to index page.
                 login_response = self.submit_form(url, l_form, login_data_new)
                 if login_response.url != url:
@@ -719,17 +652,44 @@ class Utilities(ScanConfigParameters):
             print("\n[ERROR] Something went wrong when extracting the empty values from forms. Error: ", e, file=self.err_file)
             pass
 
-    def save_cookies(self, url, session=None):
+    def save_cookies(self):
         try:
-            if session is None:
-                return self.session.cookies.get_dict()
-            else:
-                return session.cookies.get_dict()
+            return self.session.cookies.get_dict()
         except Exception as e:
             print("\n[ERROR] Something went wrong when saving cookies. Error: ", e, file=self.err_file)
             pass
 
+    def check_scan_build_url(self, url, username=None, password=None, static_scan=None, sec_level=None):
+        try:
+            # Full scan required
+            if static_scan is None:
+                # Check if static scan is not required
+                if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
+                    # if username or password not provided and are required, throw error
+                    if not (username and password):
+                        print("You need to provide login credentials first, check --help for details!")
+                        quit()
+                    # If login is required and static scan not, do login and crawl web app.
+                    elif self.process_login(username, password, sec_level):
+                        # Scan first time for URL provided by Main, then continue with others.
+                        self.spider(url)
+                else:
+                    # If login is not required, perform crawling.
+                    self.spider(url)
 
+            # Static Scan required
+            else:
+                if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
+                    # if username or password not provided and are required, throw error
+                    if not (username and password):
+                        print("You need to provide login credentials first, check --help for details!")
+                        quit()
+                    elif self.process_login(username, password, sec_level):
+                        self.DataStorage.urls.append(url)
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when checking login and scan required. Error: ", e,
+                  file=self.err_file)
+            quit()
 
 # Scanner class handles scan jobs
 class Scanner(Utilities):
@@ -737,7 +697,9 @@ class Scanner(Utilities):
         self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
         self.comprehensive_scan = comprehensive_scan
         self.check_scan_build_url(url, username, password, static_scan)
-        self.scan()
+        self.username = username
+        self.password = password
+        self.ignored_links_path = ignored_links_path
 
     def scan(self):
         try:
@@ -765,44 +727,13 @@ class Scanner(Utilities):
                 self.scan_php_exec(url)
                 self.scan_role_def_dir(url)
                 self.scan_role_def_cookie(url)
-                self.scan_session(url)
+                #self.scan_session(url)
                 #self.scan_browser_cache(url)
             return
         except Exception as e:
             print("Something went wrong when attempting to scan. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting the empty values from forms. Error: ", e, file=self.err_file)
+            print("\n[ERROR] Something went wrong when attempting to initialize scan function. Error: ", e, file=self.err_file)
             pass
-
-    def check_scan_build_url(self, url, username=None, password=None, static_scan=None):
-        try:
-            # Full scan required
-            if static_scan is None:
-                # Check if static scan is not required
-                if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
-                    # if username or password not provided and are required, throw error
-                    if not (username and password):
-                        print("You need to provide login credentials first, check --help for details!")
-                        quit()
-                    # If login is required and static scan not, do login and crawl web app.
-                    elif self.do_login(username, password):
-                        # Scan first time for URL provided by Main, then continue with others.
-                        self.spider(url)
-                else:
-                    # If login is not required, perform crawling.
-                    self.spider(url)
-
-            # Static Scan required
-            else:
-                if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
-                    # if username or password not provided and are required, throw error
-                    if not (username and password):
-                        print("You need to provide login credentials first, check --help for details!")
-                        quit()
-                    elif self.do_login(username, password):
-                        self.DataStorage.urls.append(url)
-        except Exception as e:
-            print("\n[ERROR] Something went wrong when checking login and scan required. Error: ", e, file=self.err_file)
-            quit()
 
     # Injections
 
@@ -1063,7 +994,7 @@ class Scanner(Utilities):
 
     def t_ba_role_definition_cookie(self, url):
         try:
-            cookie_dict = self.save_cookies(url)
+            cookie_dict = self.save_cookies()
             if "isadmin" in str(cookie_dict).lower():
                 if str(cookie_dict.lower()["isAdmin"]).lower() == "true" or \
                         str(cookie_dict.lower()["isAdministrator"]).lower() == "true" or \
@@ -1103,19 +1034,25 @@ class Scanner(Utilities):
 
     def t_ba_session(self, url):
         try:
-            cookie_dict = self.save_cookies(url)
+            cookie_dict = self.save_cookies()
             if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(cookie_dict).lower():
                 if 'secure' not in str(cookie_dict).lower() or 'httponly' not in str(cookie_dict).lower():
-                    return True
-            return False
+                    return True, cookie_dict
+            return False, None
         except Exception as e:
             print("\n[ERROR] Something went wrong when checking presence of session. Error: ", e, file=self.err_file)
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
     def scan_session(self, url):
-        if self.t_ba_session(url):
-            print("\nVulnerability: Session not secure...(HTTP only). Session Hijacking might be possible. \nURL: ", url)
+        session_vuln, curr_session_cookies = self.t_ba_session(url)
+        if session_vuln:
+            if self.t_ba_strong_session(url, curr_session_cookies):
+                print("\nVulnerability: Session is not secure. Session successfuly Hijacked. \nURL: ",
+                      url)
+            else:
+                print("\nVulnerability: Session not secure...(HTTP only). Session Hijacking might be possible. \nURL: ",
+                      url)
 
     def t_ba_browser_cache_weakness(self, url):
         try:
@@ -1135,7 +1072,30 @@ class Scanner(Utilities):
         if self.t_ba_browser_cache_weakness(url):
             print("Vulnerability: Potential Browser Cache Weakness vulnerability identified. \nURL: ", url)
 
-#TODO: Modify OtherUser class to enable multiple user testing, test remaning Broken Auth vulnerabilities.
+    def t_ba_strong_session(self, url, cookies):
+        try:
+            new_user = CreateUserSession(url, self.ignored_links_path, self.username, self.password, "2")
+            new_user_cookies = new_user.save_cookies()
+            for key, value in cookies.items():
+                if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(key).lower():
+                    current_session = value
+            for key, value in new_user_cookies.items():
+                if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(key).lower():
+                    new_user.session.cookies[str(key)] = str(current_session)
+                    print(new_user.session.cookies.get_dict()) # TODO: Find why session wont be chanced ffs
+            new_user_response = new_user.session.get(url)
+            print("old", cookies)
+            #print(new_user.session.cookies.get_dict())
+            # if 'login' not in new_user_response.url.lower():
+            #     return True
+            return False
+        except Exception as e:
+            print(e)
+
+class CreateUserSession(Utilities):
+    def __init__(self, url, ignored_links_path, username, password, sec_level=None):
+        self.user = Utilities.__init__(self, url, ignored_links_path, username, password)
+        #self.check_scan_build_url(url, username, password, sec_level=sec_level)
 
 #     def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths
 #         try:
@@ -2596,6 +2556,7 @@ if __name__ == '__main__':
                 else:
                     Scanner = Scanner('http://' + args.url, args.ignored_links_path,
                                       comprehensive_scan=args.comprehensive_scan)
+        Scanner.scan()
     except Exception as e:
         print("FATAL ERROR OCCURRED: ", e)
         quit()
