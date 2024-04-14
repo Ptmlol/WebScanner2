@@ -244,6 +244,7 @@ firstCallSpider = 1
 
 class DataStorage:
     def __init__(self):
+        self.xss_inj = None
         self.urls = []
         self.related_domains = []
         self.sql_dict = {}
@@ -256,7 +257,7 @@ class DataStorage:
             # Get the payload type from the Payload Local Repo.
             if p_type == 'SQL':
                 for filename in os.listdir(os.getcwd() + '/Payloads/SQL'):
-                    with open(os.path.join(os.getcwd() + '/Payloads/SQL', filename), 'r') as f:
+                    with open(os.path.join(os.getcwd() + '/Payloads/SQL', filename), 'r', encoding="utf8") as f:
                         self.sql_dict[filename.split('.')[0]] = f.read().splitlines()
                 f.close()
                 all_sql_values = []
@@ -269,12 +270,20 @@ class DataStorage:
     # https://github.com/InfoSecWarrior/Offensive-Payloads/blob/main/Html-Injection-Payloads.txt
             elif p_type == 'HTML':
                 for filename in os.listdir(os.getcwd() + '/Payloads/HTML'):
-                    with open(os.path.join(os.getcwd() + '/Payloads/HTML', filename), 'r') as f:
+                    with open(os.path.join(os.getcwd() + '/Payloads/HTML', filename), 'r', encoding="utf8") as f:
                         self.html_inj = f.readlines()
                 f.close()
                 return self.html_inj
+    # https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20Injection #TODO: better filter XSS
+            elif p_type == 'XSS':
+                print("WTF")
+                for filename in os.listdir(os.getcwd() + '/Payloads/XSS'):
+                    with open(os.path.join(os.getcwd() + '/Payloads/XSS', filename), 'r', encoding="utf8") as f:
+                        self.xss_inj = f.readlines()
+                f.close()
+                return self.xss_inj
         except Exception as e:
-            print("\n[ERROR] Something went wrong. Payload files cannot be read", e)
+            print("\n[ERROR] Something went wrong. Payload files cannot be read. Error:", e)
             pass
 
     def inject_type(self, p_type):
@@ -721,6 +730,7 @@ class Scanner(Utilities):
                     self.scan_code_exec(url, form, form_data)
                     self.scan_sql(url, form, form_data)
                     self.scan_ssi(url, form, form_data)
+                    self.scan_xss(url, form, form_data)
 
                 # URL only scan
                 self.scan_iframe(url)
@@ -843,7 +853,7 @@ class Scanner(Utilities):
                     form_data[injection_key] = html_payload
                 response_injected = self.submit_form(url, form, form_data)
                 # Check for html_payload (tags included) in response, success execution if available.
-                if html_payload in response_injected.text.lower():
+                if html_payload in response_injected.text:
                     if self.comprehensive_scan is False:
                         confidence += 1
                         return True, confidence
@@ -1091,6 +1101,28 @@ class Scanner(Utilities):
             return False
         except Exception as e:
             print(e)
+
+    def test_i_xss(self, url, form, form_data):
+        try:
+            injection_keys = self.get_injection_fields_from_form(form_data)
+            for xss_payload in self.DataStorage.payloads("XSS"):
+                print(xss_payload)
+                # Inject each payload into each injection point
+                for injection_key in injection_keys:
+                    form_data[injection_key] = xss_payload
+                response_injected = self.submit_form(url, form, form_data)
+                if xss_payload.lower() in response_injected.text.lower():
+                    return True
+            return False
+        except Exception as e:
+            print("\nSomething went wrong testing XSS in form.")
+            print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
+            pass
+
+    def scan_xss(self, url, form, form_data):
+        form_data = form_data.copy()
+        if self.test_i_xss(url, form, form_data):
+            print("\nVulnerability: XSS Injection", "\nURL: ", url, "\nFORMs: ", form)
 
 class CreateUserSession(Utilities):
     def __init__(self, url, ignored_links_path, username, password, sec_level=None):
@@ -1824,35 +1856,7 @@ class CreateUserSession(Utilities):
 #
 #     # Test XSS
 #
-#     def test_xss_in_link(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing XSS in links")
-#             except Exception:
-#                 pass
-#             xss_test_script = "<sCriPt>alert('test')</sCRiPt>"
-#             url = url.replace("=", "=" + xss_test_script)
-#             response = self.session.get(url)
-#             return xss_test_script.lower() in str(response.text) or xss_test_script in str(response.text)
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing XSS in link. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
 #
-#     def test_xss_in_form(self, form, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing XSS in forms")
-#             except Exception:
-#                 pass
-#             xss_test_script = "<sCriPt>alert('test')</sCRiPt>"
-#             response = self.submit_form(form, xss_test_script, url)
-#             return xss_test_script.lower() in str(response.text) or xss_test_script in str(response.text)
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             print("[Error Info] FORM:", form, file=self.error_file)
-#             pass
 #
 #     # Test LFI
 #
