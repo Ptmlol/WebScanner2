@@ -997,12 +997,12 @@ class Scanner(Utilities):
             return 0
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing XML Injection. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            print("Something went wrong when testing for XML Injection. Please check error file.")
             pass
 
     # Broken Authentication
 
-    def t_ba_role_definition_cookie(self, url):
+    def t_ba_role_definition_cookie(self):
         try:
             cookie_dict = self.save_cookies()
             if "isadmin" in str(cookie_dict).lower():
@@ -1020,13 +1020,19 @@ class Scanner(Utilities):
                     return True
             return False
         except Exception as e:
+            print("Something went wrong when testing for role definition on cookies. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for role definition on cookies. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
     def scan_role_def_cookie(self, url):
-        if self.t_ba_role_definition_cookie(url):
-            print("\nVulnerability: Administrator roles defined in Cookie! Session can be hijacked!", "\nURL: ", url)
+        try:
+            if self.t_ba_role_definition_cookie(url):
+                print("\nVulnerability: Administrator roles defined in Cookie! Session can be hijacked!", "\nURL: ", url)
+        except Exception as e:
+            print("Something went wrong when testing for role definition on cookies. Please check error file.")
+            print("\n[ERROR] Something went wrong when testing for role definition on cookies. Error: ", e,
+                  file=self.err_file)
+            pass
 
     def t_ba_role_definition_directories(self, url):
         try:
@@ -1035,13 +1041,18 @@ class Scanner(Utilities):
                 return True
             return False
         except Exception as e:
+            print("Something went wrong when testing for role definition directories. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for role definition directories. Error: ", e, file=self.err_file)
             pass
 
     def scan_role_def_dir(self, url):
-        if self.t_ba_role_definition_directories(url):
-            print("Vulnerability: Administrator roles defined in URLs!", "\nURL: ", url)
-
+        try:
+            if self.t_ba_role_definition_directories(url):
+                print("Vulnerability: Administrator roles defined in URLs!", "\nURL: ", url)
+        except Exception as e:
+            print("Something went wrong when testing for role definition directories. Please check error file.")
+            print("\n[ERROR] Something went wrong when testing for role definition directories. Error: ", e, file=self.err_file)
+            pass
     def t_ba_session(self, url):
         try:
             cookie_dict = self.save_cookies()
@@ -1051,18 +1062,23 @@ class Scanner(Utilities):
             return False, None
         except Exception as e:
             print("\n[ERROR] Something went wrong when checking presence of session. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            print("Something went wrong when checking presence of session. Please check error file.")
             pass
 
     def scan_session(self, url):
-        session_vuln, curr_session_cookies = self.t_ba_session(url)
-        if session_vuln:
-            if self.t_ba_strong_session(url, curr_session_cookies):
-                print("\nVulnerability: Session is not secure. Session successfuly Hijacked. \nURL: ",
-                      url)
-            else:
-                print("\nVulnerability: Session not secure...(HTTP only). Session Hijacking might be possible. \nURL: ",
-                      url)
+        try:
+            session_vuln, curr_session_cookies = self.t_ba_session(url)
+            if session_vuln:
+                if self.t_ba_strong_session(url, curr_session_cookies):
+                    print("\nVulnerability: Session is not secure. Session successfuly Hijacked. \nURL: ",
+                          url)
+                else:
+                    print("\nVulnerability: Session not secure...(HTTP only). Session Hijacking might be possible. \nURL: ",
+                          url)
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when checking presence of session. Error: ", e, file=self.err_file)
+            print("Something went wrong when checking presence of session. Please check error file.")
+            pass
 
     def t_ba_browser_cache_weakness(self, url):
         try:
@@ -1075,12 +1091,17 @@ class Scanner(Utilities):
             return True
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing browser cache. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            print("Something went wrong when testing browser cache. Please check error file.")
             pass
 
     def scan_browser_cache(self, url):
-        if self.t_ba_browser_cache_weakness(url):
-            print("Vulnerability: Potential Browser Cache Weakness vulnerability identified. \nURL: ", url)
+        try:
+            if self.t_ba_browser_cache_weakness(url):
+                print("Vulnerability: Potential Browser Cache Weakness vulnerability identified. \nURL: ", url)
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing browser cache. Error: ", e, file=self.err_file)
+            print("Something went wrong when testing browser cache. Please check error file.")
+            pass
 
     def t_ba_strong_session(self, url, cookies):
         try:
@@ -1092,7 +1113,7 @@ class Scanner(Utilities):
             for key, value in new_user_cookies.items():
                 if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(key).lower():
                     new_user.session.cookies[str(key)] = str(current_session)
-                    print(new_user.session.cookies.get_dict()) # TODO: Find why session wont be chanced ffs
+                    print(new_user.session.cookies.get_dict()) # TODO: Find why session wont be chanced ffs and check alternative ways of identification
             new_user_response = new_user.session.get(url)
             print("old", cookies)
             #print(new_user.session.cookies.get_dict())
@@ -1100,9 +1121,13 @@ class Scanner(Utilities):
             #     return True
             return False
         except Exception as e:
-            print(e)
+            print("\n[ERROR] Something went wrong when testing for strong sessions. Error: ", e, file=self.err_file)
+            print("Something went wrong when testing for strong sessions. Please check error file.")
+            pass
 
-    def test_i_xss(self, url, form, form_data):
+    # Cross Site Scripting
+
+    def test_xss(self, url, form, form_data):
         try:
             injection_keys = self.get_injection_fields_from_form(form_data)
             for xss_payload in self.DataStorage.payloads("XSS"):
@@ -1120,14 +1145,22 @@ class Scanner(Utilities):
             pass
 
     def scan_xss(self, url, form, form_data):
-        form_data = form_data.copy()
-        if self.test_i_xss(url, form, form_data):
-            print("\nVulnerability: XSS Injection", "\nURL: ", url, "\nFORMs: ", form)
+        try:
+            form_data = form_data.copy()
+            if self.test_xss(url, form, form_data):
+                print("\nVulnerability: XSS Injection", "\nURL: ", url, "\nFORMs: ", form)
+        except Exception as e:
+            print("\nSomething went wrong testing XSS in form.")
+            print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
+            pass
 
 class CreateUserSession(Utilities):
-    def __init__(self, url, ignored_links_path, username, password, sec_level=None):
-        self.user = Utilities.__init__(self, url, ignored_links_path, username, password)
-        #self.check_scan_build_url(url, username, password, sec_level=sec_level)
+    try:
+        def __init__(self, url, ignored_links_path, username, password, sec_level=None):
+            self.user = Utilities.__init__(self, url, ignored_links_path, username, password)
+            #self.check_scan_build_url(url, username, password, sec_level=sec_level)
+    except Exception as e:
+        print("Something went wrong when attempting to create a new user session.")
 
 #     def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths
 #         try:
