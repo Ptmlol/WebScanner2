@@ -276,7 +276,6 @@ class DataStorage:
                 return self.html_inj
     # https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20Injection #TODO: better filter XSS
             elif p_type == 'XSS':
-                print("WTF")
                 for filename in os.listdir(os.getcwd() + '/Payloads/XSS'):
                     with open(os.path.join(os.getcwd() + '/Payloads/XSS', filename), 'r', encoding="utf8") as f:
                         self.xss_inj = f.readlines()
@@ -381,9 +380,9 @@ class ScanConfigParameters:
 
             try:
                 #  Try to read an existing link Ignore file, create one if none is found.
-                self.ignored_links = open(ignored_links_path + '\\linkignore.log', 'r')
+                self.ignored_links = open(ignored_links_path + '/linkignore.log', 'r')
                 # Check if file is empty before writing.
-                if os.stat(ignored_links_path + '\\linkignore.log').st_size == 0:
+                if os.stat(ignored_links_path + '/linkignore.log').st_size == 0:
                     self.ignored_links.write("www.exampleurl.com")
                 # Add the ignored links to a class variable
                 self.ignored_links = self.ignored_links.read()
@@ -594,6 +593,23 @@ class Utilities(ScanConfigParameters):
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
+    def extract_inputs(self, url):
+        try:
+            # Extract Inputs the same way forms are extracted
+            response = self.session.get(url, timeout=300)
+            response.raise_for_status()
+            parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
+            return parsed_html.findAll("input")
+        except requests.HTTPError as e:
+            print("Something went wrong. A HTTP error occurred. Please check error file.")
+            print("\n[ERROR] Something went wrong when extracting inputs from links. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+        except Exception as e:
+            print("Something went wrong. Please check error file.")
+            print("\n[ERROR] Something went wrong when extracting inputs from links. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
     @staticmethod
     def build_iframe_url(url, iframe, payload):
         try: # TODO: Check if URL needs shadow copy as well (currently seems like not)
@@ -612,8 +628,10 @@ class Utilities(ScanConfigParameters):
             # Get the action (URL or PATH)
             action = form.get("action")
             # Get the method (GET, POST, PUT etc.)
-            method = form.get("method").upper()
-
+            if form.get("method"):
+                method = form.get("method").upper()
+            else:
+                return 0
             # Check if action is URL or if it is path relative to URL.
             if action.startswith('http'):
                 action_url = action
@@ -724,7 +742,6 @@ class Scanner(Utilities):
                     # Ignore page default forms
                     if any([True for key, value in form_data.items() if key == 'form_security_level' or key == 'form_bug']):
                         continue
-
                     # Form and URL scan
                     self.scan_html(url, form, form_data)
                     self.scan_code_exec(url, form, form_data)
@@ -737,8 +754,9 @@ class Scanner(Utilities):
                 self.scan_php_exec(url)
                 self.scan_role_def_dir(url)
                 self.scan_role_def_cookie(url)
-                #self.scan_session(url)
+                #self.scan_session(url) # TODO : Fix Strong Sessions
                 #self.scan_browser_cache(url)
+                self.scan_xml(url)
             return
         except Exception as e:
             print("Something went wrong when attempting to scan. Please check error file.")
@@ -776,9 +794,16 @@ class Scanner(Utilities):
             sql_type_list = set()
             time_based = False
             # Get Initial ~ normal response time with no Payload
-            response_time_wo_1 = self.submit_form(url, form, "").elapsed.total_seconds()
+            response_wo_1 = self.submit_form(url, form, "")
+            if not response_wo_1:
+                return 0, 0, 0
+            response_time_wo_1 = response_wo_1.elapsed.total_seconds()
             response_time_wo_2 = self.submit_form(url, form, "").elapsed.total_seconds()
             response_time_wo_3 = self.submit_form(url, form, "").elapsed.total_seconds()
+
+            if not response_time_wo_1 or not response_time_wo_2 or not response_time_wo_3:
+                return 0, 0, 0
+
             # Create average response time
             avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3) / 3
 
@@ -792,8 +817,9 @@ class Scanner(Utilities):
                 if time_based and self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
                     continue
                 response_injected = self.submit_form(url, form, form_data)
+                if not response_injected:
+                    return 0, 0, 0
                 payload_response_time = response_injected.elapsed.total_seconds()
-
                 # Get time of response and check.
                 if payload_response_time > avg_response_time and payload_response_time > 2 and time_based is False:
                     # Vulnerable to Time based SQL type X, increase confidence
@@ -852,6 +878,8 @@ class Scanner(Utilities):
                 for injection_key in injection_keys:
                     form_data[injection_key] = html_payload
                 response_injected = self.submit_form(url, form, form_data)
+                if not response_injected:
+                    return 0, 0
                 # Check for html_payload (tags included) in response, success execution if available.
                 if html_payload in response_injected.text:
                     if self.comprehensive_scan is False:
@@ -863,7 +891,7 @@ class Scanner(Utilities):
                 return True, confidence
             return False, 0
         except Exception as e:
-            print("Something went wrong when testing SQL Injections. Please check error file.")
+            print("Something went wrong when testing HTML Injections. Please check error file.")
             print("\n[ERROR] Something went wrong when testing HTML Injection. Error: ", e, file=self.err_file)
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
@@ -915,6 +943,8 @@ class Scanner(Utilities):
             for injection_key in injection_keys:
                 form_data[injection_key] = code_exec_payload
             response = self.submit_form(url, form, form_data)
+            if not response:
+                return 0
             # Detect both blind and standard Code Execs.
             if response.elapsed.total_seconds() > 1.5:
                 return True
@@ -975,6 +1005,8 @@ class Scanner(Utilities):
             for injection_key in injection_keys:
                 form_data[injection_key] = ssi_payload
             response = self.submit_form(url, form, form_data)
+            if not response:
+                return 0
             return re.findall('\d\d:\d\d:\d\d', str(response.text))
         except Exception as e:
             print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
@@ -992,13 +1024,20 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
             pass
 
-    def t_i_xml(self, url, form, form_data): # TODO: need way to dynamically identify XEE
+    def t_i_xml(self, url): # TODO: need way to dynamically identify XEE + add AJAX detection
         try:
+            input_list = self.extract_inputs(url)
+            for input in input_list:
+                print(input)
             return 0
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing XML Injection. Error: ", e, file=self.err_file)
             print("Something went wrong when testing for XML Injection. Please check error file.")
             pass
+
+    def scan_xml(self, url):
+        if self.t_i_xml(url):
+            return 0
 
     # Broken Authentication
 
@@ -1026,7 +1065,7 @@ class Scanner(Utilities):
 
     def scan_role_def_cookie(self, url):
         try:
-            if self.t_ba_role_definition_cookie(url):
+            if self.t_ba_role_definition_cookie():
                 print("\nVulnerability: Administrator roles defined in Cookie! Session can be hijacked!", "\nURL: ", url)
         except Exception as e:
             print("Something went wrong when testing for role definition on cookies. Please check error file.")
@@ -1053,6 +1092,7 @@ class Scanner(Utilities):
             print("Something went wrong when testing for role definition directories. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for role definition directories. Error: ", e, file=self.err_file)
             pass
+
     def t_ba_session(self, url):
         try:
             cookie_dict = self.save_cookies()
@@ -1131,11 +1171,12 @@ class Scanner(Utilities):
         try:
             injection_keys = self.get_injection_fields_from_form(form_data)
             for xss_payload in self.DataStorage.payloads("XSS"):
-                print(xss_payload)
                 # Inject each payload into each injection point
                 for injection_key in injection_keys:
                     form_data[injection_key] = xss_payload
                 response_injected = self.submit_form(url, form, form_data)
+                if not response_injected:
+                    return 0
                 if xss_payload.lower() in response_injected.text.lower():
                     return True
             return False
@@ -1154,11 +1195,12 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
             pass
 
+
 class CreateUserSession(Utilities):
     try:
         def __init__(self, url, ignored_links_path, username, password, sec_level=None):
             self.user = Utilities.__init__(self, url, ignored_links_path, username, password)
-            #self.check_scan_build_url(url, username, password, sec_level=sec_level)
+            # self.check_scan_build_url(url, username, password, sec_level=sec_level)
     except Exception as e:
         print("Something went wrong when attempting to create a new user session.")
 
@@ -2543,6 +2585,7 @@ class CreateUserSession(Utilities):
 #
 #
 # start_program()
+
 
 if __name__ == '__main__':
     try:
