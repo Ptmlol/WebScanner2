@@ -504,7 +504,7 @@ class Utilities(ScanConfigParameters):
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
-    def get_headers(self, url):
+    def extract_headers(self, url):
         try:
             # Get headers of an URL.
             return self.session.get(url).headers
@@ -664,7 +664,7 @@ class Utilities(ScanConfigParameters):
             print("\n[ERROR] Something went wrong when modifying the User-Agent. Error: ", e, file=self.err_file)
             pass
 
-    def get_injection_fields_from_form(self, form_data):
+    def extract_injection_fields_from_form(self, form_data):
         try:
             keys_to_populate = []
             # Find the emtpy form values, meaning they await user input, add them to a list and return the list
@@ -679,7 +679,16 @@ class Utilities(ScanConfigParameters):
             print("\n[ERROR] Something went wrong when extracting the empty values from forms. Error: ", e, file=self.err_file)
             pass
 
-    def save_cookies(self):
+    def extract_name_value(self, form_data):
+        try:
+            if 'name' in str(form_data):
+                return form_data['name']
+            return 0
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when extracting name value from form. Error: ", e, file=self.err_file)
+            pass
+
+    def extract_cookies(self):
         try:
             return self.session.cookies.get_dict()
         except Exception as e:
@@ -718,6 +727,37 @@ class Utilities(ScanConfigParameters):
                   file=self.err_file)
             quit()
 
+    def extract_non_form_inputs(self, url):
+        try:
+            name_list = []
+            action_urls = []
+            input_list = self.extract_inputs(url)
+            for input in input_list:
+                name_list.append(self.extract_name_value(input))
+            for name in name_list:
+                action_urls.append(str(url + '?' + name + '='))
+            return action_urls
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when extracting non-form inputs. Error: ", e, file=self.err_file)
+
+    def extract_forms_and_form_data(self, url):
+        try:
+            form_list = []
+            form_data_list = []
+            # Extract forms from each URL
+            for form in self.extract_forms(url):
+                # For each form extract the details needed for payload submission
+                form_data = self.extract_form_details(form)
+                # Ignore page default forms
+                if any([True for key, value in form_data.items() if key == 'form_security_level' or key == 'form_bug']):
+                    continue
+                form_list.append(form)
+                form_data_list.append(form_data)
+            return form_list, form_data_list
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when extracting form and form_data. Error: ", e, file=self.err_file)
+
+
 # Scanner class handles scan jobs
 class Scanner(Utilities):
     def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None, comprehensive_scan=None):
@@ -735,33 +775,24 @@ class Scanner(Utilities):
                 # Call all functions for tests for each URL. ignore links ignored in file
                 if url in self.ignored_links:
                     continue
-                # Extract forms from each URL
-                for form in self.extract_forms(url):
-                    # For each form extract the details needed for payload submission
-                    form_data = self.extract_form_details(form)
-                    # Ignore page default forms
-                    if any([True for key, value in form_data.items() if key == 'form_security_level' or key == 'form_bug']):
-                        continue
-                    # Form and URL scan
-                    self.scan_html(url, form, form_data)
-                    self.scan_code_exec(url, form, form_data)
-                    self.scan_sql(url, form, form_data)
-                    self.scan_ssi(url, form, form_data)
-                    self.scan_xss(url, form, form_data)
-
-                # URL only scan
-                self.scan_iframe(url)
-                self.scan_php_exec(url)
-                self.scan_role_def_dir(url)
-                self.scan_role_def_cookie(url)
-                #self.scan_session(url) # TODO : Fix Strong Sessions
-                #self.scan_browser_cache(url)
-                self.scan_xml(url)
+                # Form and URL scan
+                self.scan_html(url) # Good on form TODO: Do other input detection
+                self.scan_iframe(url) # Good, no actions required
+                self.scan_code_exec(url) # Good on form TODO: Do other input detection
+                self.scan_php_exec(url)  # Good, no actions required
+                self.scan_ssi(url)  # Good on form TODO: Do other input detection
+                self.scan_sql(url) # Good on form TODO: Do other input detection
+                self.scan_role_def_dir(url) # Good, no actions required
+                self.scan_role_def_cookie(url) # Good, no actions required
+                self.scan_browser_cache(url) # Good, no actions required
+                # self.scan_session(url) # TODO : Fix Strong Sessions
+                self.scan_xss(url)  # Good on form TODO: Do other input detection
+                # self.t_i_xml(url)
             return
         except Exception as e:
             print("Something went wrong when attempting to scan. Please check error file.")
             print("\n[ERROR] Something went wrong when attempting to initialize scan function. Error: ", e, file=self.err_file)
-            pass
+            quit()
 
     # Injections
 
@@ -808,7 +839,7 @@ class Scanner(Utilities):
             avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3) / 3
 
             # Find the injection points for the SQL Payload
-            injection_keys = self.get_injection_fields_from_form(form_data)
+            injection_keys = self.extract_injection_fields_from_form(form_data)
             for sql_payload in self.DataStorage.payloads("SQL"):
                 # Populate injection keys with payloads.
                 for injection_key in injection_keys:
@@ -831,38 +862,37 @@ class Scanner(Utilities):
                 if "error" in response_injected.text.lower():  # TODO: Might need to create other detection condition.
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
+                # Check if comprehensive scan is required, if not, jump out on 3 vulnerabilities hit, for time management.
 
-                # Check if comprehensive scan is required, if not, jump out on 10 vulnerabilities hit, for time management.
-                if self.comprehensive_scan is False:
-                    if confidence == 10:
-                        return True, sql_type_list, confidence
-            # Check if vulnerability is found or not, if comprehensive is required.
-            if confidence != 0:
-                return True, sql_type_list, confidence
-            elif confidence == 0:
-                return False, [], 0
+                if self.comprehensive_scan is False and confidence > 0:
+
+                    return True, sql_type_list, confidence
+                # Check if vulnerability is found or not, if comprehensive is required.
+                elif self.comprehensive_scan is True and sql_payload == self.DataStorage.payloads("SQL")[-1] and confidence > 0:
+                    return True, sql_type_list, confidence
+            return False, [], 0
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
             print("[Error Info] FORM:", form, file=self.err_file)
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
-    def scan_sql(self, url, form, form_data):
+    def scan_sql(self, url):
         try:
-            # Create shadow copy so variable is not modified by reference
-            form_data = form_data.copy()
-            # Test SQL Injections and print results
-            sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data)
-            if sql_vuln:
-                if sql_conf == 10:
-                    print("\nVulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
-                    print("Multiple other SQL Vulnerabilities suspected, reached max Confidence, use --comprehensive_scan option for in-depth scan")
-                else:
-                    print("\nVulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
-            # Bulk up User-Agent SQL Injection detection in the same function
-            if self.t_ua_sql(url):
-                print("\nVulnerability: SQL User Agent Injection", "\nURL: ", url)
-            return
+            form_list, form_data_list = self.extract_forms_and_form_data(url)
+            for index, form in enumerate(form_list):
+                # Test SQL Injections and print results
+                sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data_list[index])
+                if sql_vuln:
+                    if 0 < sql_conf <= 3:
+                        print("\nVulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
+                        print("Multiple other SQL Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
+                    elif sql_conf > 3:
+                        print("\n[Comprehensive Scan] Vulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
+                # Bulk up User-Agent SQL Injection detection in the same function
+                if self.t_ua_sql(url):
+                    print("\n[Comprehensive Scan] Vulnerability: SQL User Agent Injection", "\nURL: ", url)
+                return
         except Exception as e:
             print("Something went wrong when testing SQL Injections. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
@@ -872,7 +902,7 @@ class Scanner(Utilities):
         try:
             # Select injection points from form details
             confidence = 0
-            injection_keys = self.get_injection_fields_from_form(form_data)
+            injection_keys = self.extract_injection_fields_from_form(form_data)
             for html_payload in self.DataStorage.payloads("HTML"):
                 # Inject each payload into each injection point
                 for injection_key in injection_keys:
@@ -882,13 +912,11 @@ class Scanner(Utilities):
                     return 0, 0
                 # Check for html_payload (tags included) in response, success execution if available.
                 if html_payload in response_injected.text:
-                    if self.comprehensive_scan is False:
-                        confidence += 1
-                        return True, confidence
-                    else:
-                        confidence += 1
-            if confidence > 0:
-                return True, confidence
+                    confidence += 1
+                if self.comprehensive_scan is False and confidence > 0:
+                    return True, confidence
+                elif self.comprehensive_scan is True and html_payload == self.DataStorage.payloads("HTML")[-1] and confidence > 0:
+                    return True, confidence
             return False, 0
         except Exception as e:
             print("Something went wrong when testing HTML Injections. Please check error file.")
@@ -896,14 +924,18 @@ class Scanner(Utilities):
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
-    def scan_html(self, url, form, form_data):
+    def scan_html(self, url):
         try:
-            # Create shadow copy so variable is not modified by reference
-            form_data = form_data.copy()
-            html_vuln, confidence = self.t_i_html(url, form, form_data)
-            # Print if Vulnerabilities are found.
-            if html_vuln:
-                print("\nVulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
+            form_list, form_data_list = self.extract_forms_and_form_data(url)
+            for index, form in enumerate(form_list):
+                html_vuln, confidence = self.t_i_html(url, form, form_data_list[index])
+                # Print if Vulnerabilities are found.
+                if html_vuln:
+                    if 0 < confidence <= 3:
+                        print("\nVulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
+                        print("Multiple other HTML Injection Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
+                    else:
+                        print("\n[Comprehensive Scan] Vulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
         except Exception as e:
             print("Something went wrong when testing HTML Injections. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for HTML Injection. Error: ", e, file=self.err_file)
@@ -939,7 +971,7 @@ class Scanner(Utilities):
             # Detects blind and standard Code Exec (Ping for 3 seconds)
             code_exec_payload = "| ping -c 3 127.0.0.1"
             # Get injection points and inject the payload.
-            injection_keys = self.get_injection_fields_from_form(form_data)
+            injection_keys = self.extract_injection_fields_from_form(form_data)
             for injection_key in injection_keys:
                 form_data[injection_key] = code_exec_payload
             response = self.submit_form(url, form, form_data)
@@ -954,12 +986,12 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
             pass
 
-    def scan_code_exec(self, url, form, form_data):
+    def scan_code_exec(self, url):
         try:
-            # Create shadow copy so variable is not modified by reference
-            form_data = form_data.copy()
-            if self.t_i_code_exec(url, form, form_data):
-                print("\nVulnerability: Code Execution", "\nURL: ", url, "\nFORMs: ", form)
+            form_list, form_data_list = self.extract_forms_and_form_data(url)
+            for index, form in enumerate(form_list):
+                if self.t_i_code_exec(url, form, form_data_list[index]):
+                    print("\nVulnerability: Code Execution", "\nURL: ", url, "\nFORMs: ", form)
         except Exception as e:
             print("Something went wrong when testing for Code Execution Injection. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
@@ -998,10 +1030,10 @@ class Scanner(Utilities):
 
     def t_i_ssi(self, url, form, form_data):
         try:
-            # Non blind detection. Search for UNIX time format in response.
+            # Non-blind detection. Search for UNIX time format in response.
             ssi_payload = '<!--#exec cmd=uptime -->'
             # Inject only injectable fields
-            injection_keys = self.get_injection_fields_from_form(form_data)
+            injection_keys = self.extract_injection_fields_from_form(form_data)
             for injection_key in injection_keys:
                 form_data[injection_key] = ssi_payload
             response = self.submit_form(url, form, form_data)
@@ -1013,12 +1045,12 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
             pass
 
-    def scan_ssi(self, url, form, form_data):
+    def scan_ssi(self, url):
         try:
-            # Create copy of form data.
-            form_data = form_data.copy()
-            if self.t_i_ssi(url, form, form_data):
-                print("\nVulnerability: SSI Code Execution in URL", "\nURL: ", url, "\nFORMs: ", form)
+            form_list, form_data_list = self.extract_forms_and_form_data(url)
+            for index, form in enumerate(form_list):
+                if self.t_i_ssi(url, form, form_data_list[index]):
+                    print("\nVulnerability: SSI Code Execution in URL", "\nURL: ", url, "\nFORMs: ", form)
         except Exception as e:
             print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
             print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
@@ -1026,24 +1058,23 @@ class Scanner(Utilities):
 
     def t_i_xml(self, url): # TODO: need way to dynamically identify XEE + add AJAX detection
         try:
-            input_list = self.extract_inputs(url)
-            for input in input_list:
-                print(input)
-            return 0
+            ajax_xml_urls = self.extract_non_form_inputs(url)
+            print(ajax_xml_urls)
+            # for sql_payload in self.DataStorage.payloads("SQL"):
+            #     response = self.session.get(action_url + sql_payload)
+            #     if "error" in response.text.lower():
+            #         return True
+            return False
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing XML Injection. Error: ", e, file=self.err_file)
             print("Something went wrong when testing for XML Injection. Please check error file.")
             pass
 
-    def scan_xml(self, url):
-        if self.t_i_xml(url):
-            return 0
-
-    # Broken Authentication
+    # Broken Authentication & Session Mgmnt
 
     def t_ba_role_definition_cookie(self):
         try:
-            cookie_dict = self.save_cookies()
+            cookie_dict = self.extract_cookies()
             if "isadmin" in str(cookie_dict).lower():
                 if str(cookie_dict.lower()["isAdmin"]).lower() == "true" or \
                         str(cookie_dict.lower()["isAdministrator"]).lower() == "true" or \
@@ -1095,7 +1126,7 @@ class Scanner(Utilities):
 
     def t_ba_session(self, url):
         try:
-            cookie_dict = self.save_cookies()
+            cookie_dict = self.extract_cookies()
             if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(cookie_dict).lower():
                 if 'secure' not in str(cookie_dict).lower() or 'httponly' not in str(cookie_dict).lower():
                     return True, cookie_dict
@@ -1146,7 +1177,7 @@ class Scanner(Utilities):
     def t_ba_strong_session(self, url, cookies):
         try:
             new_user = CreateUserSession(url, self.ignored_links_path, self.username, self.password, "2")
-            new_user_cookies = new_user.save_cookies()
+            new_user_cookies = new_user.extract_cookies()
             for key, value in cookies.items():
                 if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(key).lower():
                     current_session = value
@@ -1169,27 +1200,39 @@ class Scanner(Utilities):
 
     def test_xss(self, url, form, form_data):
         try:
-            injection_keys = self.get_injection_fields_from_form(form_data)
+            confidence = 0
+            injection_keys = self.extract_injection_fields_from_form(form_data)
             for xss_payload in self.DataStorage.payloads("XSS"):
                 # Inject each payload into each injection point
                 for injection_key in injection_keys:
                     form_data[injection_key] = xss_payload
                 response_injected = self.submit_form(url, form, form_data)
                 if not response_injected:
-                    return 0
+                    return False, 0
                 if xss_payload.lower() in response_injected.text.lower():
-                    return True
-            return False
+                    confidence += 1
+                if self.comprehensive_scan is False and confidence > 0:
+                    return True, confidence
+                elif self.comprehensive_scan is True and xss_payload == self.DataStorage.payloads("XSS")[ -1] and confidence > 0:
+                    return True, confidence
+            return False, 0
         except Exception as e:
             print("\nSomething went wrong testing XSS in form.")
             print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
             pass
 
-    def scan_xss(self, url, form, form_data):
+    def scan_xss(self, url):
         try:
-            form_data = form_data.copy()
-            if self.test_xss(url, form, form_data):
-                print("\nVulnerability: XSS Injection", "\nURL: ", url, "\nFORMs: ", form)
+            form_list, form_data_list = self.extract_forms_and_form_data(url)
+            for index, form in enumerate(form_list):
+                xss_vuln, confidence = self.test_xss(url, form, form_data_list[index])
+                if xss_vuln:
+                    if 0 < confidence <= 3:
+                        print("\nVulnerability: XSS Injection", "\nURL: ", url,"\nConfidence: ", confidence, "\nFORMs: ", form)
+                        print("Multiple other XX Injection Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
+                    else:
+                        print("\n[Comprehensive Scan] Vulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
+            return 0
         except Exception as e:
             print("\nSomething went wrong testing XSS in form.")
             print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
@@ -1368,7 +1411,7 @@ class CreateUserSession(Utilities):
     #         except Exception:
     #             pass
     #         global server_set
-    #         header_for_link = self.get_headers(url)
+    #         header_for_link = self.extract_headers(url)
     #         server_set.add(header_for_link["Server"])
     #         return
     #     except Exception as e:
@@ -1503,7 +1546,7 @@ class CreateUserSession(Utilities):
 #
 #     def check_secure_tag_cookie_sessid(self, url):
 #         try:
-#             cookie_dict = self.save_cookies(url)
+#             cookie_dict = self.extract_cookies(url)
 #             if "sid" or "sessionid" or "session" or "sessiontoken" or "sessid" in str(cookie_dict).lower():
 #                 if "secure" or not "httponly" not in str(cookie_dict).lower() or not "secure" and "httponly" not in str(cookie_dict).lower():
 #                     return True
@@ -1614,7 +1657,7 @@ class CreateUserSession(Utilities):
 #             except Exception:
 #                 pass
 #             dummy_session = OtherUser(config_object["CREDENTIAL"]["username_2"], config_object["CREDENTIAL"]["known_password_2"], err_file=self.error_file).session
-#             cookie_dict = self.save_cookies(url, dummy_session)
+#             cookie_dict = self.extract_cookies(url, dummy_session)
 #             key_list = list(cookie_dict.keys())
 #             for key in key_list:
 #                 dummy_session.cookies.set(key, "../")
@@ -1646,7 +1689,7 @@ class CreateUserSession(Utilities):
 #                                    config_object["CREDENTIAL"]["known_password_2"], url, err_file=self.error_file)
 #             dummy_session = dummy_user.session
 #             dummy_session.get(url)
-#             cookie_dict = self.save_cookies(url, dummy_session)
+#             cookie_dict = self.extract_cookies(url, dummy_session)
 #             key_list = list(cookie_dict.keys())
 #             for key in key_list:
 #                 if key.lower() == "sid" or "sessionid" or "session" or "sessiontoken" or "sessid":
@@ -1839,7 +1882,7 @@ class CreateUserSession(Utilities):
 #                 my_gui.update_list_gui("Testing HSTS")
 #             except Exception:
 #                 pass
-#             headers = self.get_headers(config_object['WEBURL']['target'])
+#             headers = self.extract_headers(config_object['WEBURL']['target'])
 #             if 'strict' not in str(headers).lower():
 #                 return True
 #             return False
