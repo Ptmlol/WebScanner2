@@ -336,7 +336,7 @@ class DataStorage:
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:30.0) Gecko/20100101 Firefox/30.0',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10) AppleWebKit/600.1.3 (KHTML, like Gecko) Version/8.0 Safari/600.1.3',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 Safari/537.36']
-        # returns random legitimte user agent
+        # returns random legitimate user agent
         return random.choice(user_agent)
 
 
@@ -772,10 +772,14 @@ class Utilities(ScanConfigParameters):
             if input_list_fin:
                 for field in input_list_fin:
                     if field.get('name'):
-                        form_data[field.get('name')] = ''
+                        form_data[field.get('name')] = 'The Cabin in the Woods'
+            # TODO: Search scripts and soruces with regex for .php after landing here
+            # Harvest page for scripts containing path, since none can be found
+            potential_paths = re.findall(r'["\']([^"\']*\.php)["\']', self.session.get(url).text)
+            for potential_path in potential_paths:
             return form_data
         except Exception as e:
-            print("Error in check_input_type.")
+            print("Error in check_input_type.", e)
             print("Error in check_input_type. Error: ", e, file=self.err_file)
             pass
 
@@ -912,7 +916,8 @@ class Scanner(Utilities):
                 # Bulk up User-Agent SQL Injection detection in the same function
             if self.t_ua_sql(url):
                 print("\n[Comprehensive Scan] Vulnerability: SQL User Agent Injection", "\nURL: ", url)
-            #self.check_input_type(url)
+            self.check_input_type(url)
+
             return
         except Exception as e:
             print("Something went wrong when testing SQL Injections. Please check error file.")
