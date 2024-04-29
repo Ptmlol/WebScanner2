@@ -534,7 +534,6 @@ class Utilities(ScanConfigParameters):
     @staticmethod
     def extract_form_details(form):
         form_data = {}
-
         try:
             # Extract input fields and their names from the form
             input_fields = form.find_all('input')
@@ -757,6 +756,28 @@ class Utilities(ScanConfigParameters):
         except Exception as e:
             print("\n[ERROR] Something went wrong when extracting form and form_data. Error: ", e, file=self.err_file)
 
+    def check_input_type(self, url): # TODO: Currently captures the inputs outside of forms and without good form submission.
+        try:
+            input_list_fin = set()
+            form_data = {}
+            soup = BeautifulSoup(self.session.get(url, timeout=300).content, 'html.parser')
+            input_list = soup.findAll('input')
+            for input in input_list:
+                if input.find_parent('form'):
+                    parent_attr = input.find_parent('form').attrs
+                    if not (('action' in parent_attr) or ('button' in parent_attr)):
+                        input_list_fin.add(input)
+                else:
+                    input_list_fin.add(input)
+            if input_list_fin:
+                for field in input_list_fin:
+                    if field.get('name'):
+                        form_data[field.get('name')] = ''
+            return form_data
+        except Exception as e:
+            print("Error in check_input_type.")
+            print("Error in check_input_type. Error: ", e, file=self.err_file)
+            pass
 
 # Scanner class handles scan jobs
 class Scanner(Utilities):
@@ -865,7 +886,6 @@ class Scanner(Utilities):
                 # Check if comprehensive scan is required, if not, jump out on 3 vulnerabilities hit, for time management.
 
                 if self.comprehensive_scan is False and confidence > 0:
-
                     return True, sql_type_list, confidence
                 # Check if vulnerability is found or not, if comprehensive is required.
                 elif self.comprehensive_scan is True and sql_payload == self.DataStorage.payloads("SQL")[-1] and confidence > 0:
@@ -890,9 +910,10 @@ class Scanner(Utilities):
                     elif sql_conf > 3:
                         print("\n[Comprehensive Scan] Vulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
                 # Bulk up User-Agent SQL Injection detection in the same function
-                if self.t_ua_sql(url):
-                    print("\n[Comprehensive Scan] Vulnerability: SQL User Agent Injection", "\nURL: ", url)
-                return
+            if self.t_ua_sql(url):
+                print("\n[Comprehensive Scan] Vulnerability: SQL User Agent Injection", "\nURL: ", url)
+            #self.check_input_type(url)
+            return
         except Exception as e:
             print("Something went wrong when testing SQL Injections. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
