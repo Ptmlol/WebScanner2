@@ -734,7 +734,7 @@ class Utilities(ScanConfigParameters):
             for input in input_list:
                 name_list.append(self.extract_name_value(input))
             for name in name_list:
-                action_urls.append(str(url + '?' + name + '='))
+                action_urls.append(str(url + '?' + str(name) + '='))
             return action_urls
         except Exception as e:
             print("\n[ERROR] Something went wrong when extracting non-form inputs. Error: ", e, file=self.err_file)
@@ -756,10 +756,12 @@ class Utilities(ScanConfigParameters):
         except Exception as e:
             print("\n[ERROR] Something went wrong when extracting form and form_data. Error: ", e, file=self.err_file)
 
-    def check_input_type(self, url): # TODO: Currently captures the inputs outside of forms and without good form submission.
+    def no_form_input_content(self, url, payload): # TODO: Need to get the .JS from sources also to work flawlessly
         try:
+            # Extract inputs outside of form or with no method/action in form
             input_list_fin = set()
             form_data = {}
+            response_list = []
             soup = BeautifulSoup(self.session.get(url, timeout=300).content, 'html.parser')
             input_list = soup.findAll('input')
             for input in input_list:
@@ -772,15 +774,24 @@ class Utilities(ScanConfigParameters):
             if input_list_fin:
                 for field in input_list_fin:
                     if field.get('name'):
-                        form_data[field.get('name')] = 'The Cabin in the Woods'
-            # TODO: Search scripts and soruces with regex for .php after landing here
+                        form_data[field.get('name')] = payload
+
             # Harvest page for scripts containing path, since none can be found
+            # Brute-force inputs for destination path.
             potential_paths = re.findall(r'["\']([^"\']*\.php)["\']', self.session.get(url).text)
+            new_temp_url = re.match('^https?:\/\/([^\/]+\/)*', url)
+            potential_paths.append(url)
             for potential_path in potential_paths:
-            return form_data
+                # Ignore commonly used words unrelated with what is needed.
+                if 'logout' in str(potential_path).lower() or 'reset' in str(potential_path).lower() or 'change' in str(potential_path).lower():
+                    continue
+                new_url = str(new_temp_url.group()) + potential_path
+                if self.session.get(new_url).status_code == 200:
+                    response_list.append(self.session.post(new_url, params=form_data))
+            return response_list
         except Exception as e:
-            print("Error in check_input_type.", e)
-            print("Error in check_input_type. Error: ", e, file=self.err_file)
+            print("Error in no_form_input_content.", e)
+            print("Error in no_form_input_content. Error: ", e, file=self.err_file)
             pass
 
 # Scanner class handles scan jobs
@@ -801,17 +812,17 @@ class Scanner(Utilities):
                 if url in self.ignored_links:
                     continue
                 # Form and URL scan
-                self.scan_html(url) # Good on form TODO: Do other input detection
-                self.scan_iframe(url) # Good, no actions required
-                self.scan_code_exec(url) # Good on form TODO: Do other input detection
-                self.scan_php_exec(url)  # Good, no actions required
-                self.scan_ssi(url)  # Good on form TODO: Do other input detection
-                self.scan_sql(url) # Good on form TODO: Do other input detection
-                self.scan_role_def_dir(url) # Good, no actions required
-                self.scan_role_def_cookie(url) # Good, no actions required
-                self.scan_browser_cache(url) # Good, no actions required
+                self.scan_html(url)
+                self.scan_iframe(url)
+                self.scan_code_exec(url)
+                self.scan_php_exec(url)
+                self.scan_ssi(url)
+                self.scan_sql(url)
+                self.scan_role_def_dir(url)
+                self.scan_role_def_cookie(url)
+                self.scan_browser_cache(url)
                 # self.scan_session(url) # TODO : Fix Strong Sessions
-                self.scan_xss(url)  # Good on form TODO: Do other input detection
+                self.scan_xss(url)
                 # self.t_i_xml(url)
             return
         except Exception as e:
@@ -821,27 +832,7 @@ class Scanner(Utilities):
 
     # Injections
 
-    def t_ua_sql(self, url):
-        try:
-            # Get Initial ~ normal response time with no Payload
-            response_time_wo = self.session.get(url, timeout=300).elapsed.total_seconds()
-            # Check only one time injection as it keeps the app loading for a long time if all time payloads are injected
-            time_based = False
-            for sql_payload in self.DataStorage.payloads("SQL"):
-                # Inject headers with payloads
-                headers = self.custom_user_agent(sql_payload)
-                response = self.session.get(url, timeout=300, headers=headers)
-                # Check response type (time or feedback)
-                if time_based is False and response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
-                    time_based = True
-                    continue
-                if "error" in response.text.lower():  # TODO: Might need to create other detection condition.
-                    return True
-            return False
-        except Exception as e:
-            print("Something went wrong when testing for User-Agent SQL Injections. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for User-Agent SQL Injections. Error: ", e, file=self.err_file)
-            pass
+    # SQL Injection (Form inputs, non-form inputs) (time based and generic)
 
     def t_i_sql(self, url, form, form_data):
         try:
@@ -901,8 +892,48 @@ class Scanner(Utilities):
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
+    def t_i_sql_nfi(self, url):
+        try:
+            for sql_payload in self.DataStorage.payloads("SQL"):
+                if not self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
+                    continue
+                response_injected = self.no_form_input_content(url, sql_payload)
+                if not response_injected:
+                    return 0
+                for response_inj in response_injected:
+                    if response_inj.elapsed.total_seconds() > 4.5:
+                        return True
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing for SQL Injection with no form inputs. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def t_ua_sql(self, url):
+        try:
+            # Get Initial ~ normal response time with no Payload
+            response_time_wo = self.session.get(url, timeout=300).elapsed.total_seconds()
+            # Check only one time injection as it keeps the app loading for a long time if all time payloads are injected
+            time_based = False
+            for sql_payload in self.DataStorage.payloads("SQL"):
+                # Inject headers with payloads
+                headers = self.custom_user_agent(sql_payload)
+                response = self.session.get(url, timeout=300, headers=headers)
+                # Check response type (time or feedback)
+                if time_based is False and response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
+                    time_based = True
+                    continue
+                if "error" in response.text.lower():  # TODO: Might need to create other detection condition.
+                    return True
+            return False
+        except Exception as e:
+            print("Something went wrong when testing for User-Agent SQL Injections. Please check error file.")
+            print("\n[ERROR] Something went wrong when testing for User-Agent SQL Injections. Error: ", e, file=self.err_file)
+            pass
+
     def scan_sql(self, url):
         try:
+            # Scan inputs in form
             form_list, form_data_list = self.extract_forms_and_form_data(url)
             for index, form in enumerate(form_list):
                 # Test SQL Injections and print results
@@ -913,11 +944,14 @@ class Scanner(Utilities):
                         print("Multiple other SQL Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
                     elif sql_conf > 3:
                         print("\n[Comprehensive Scan] Vulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
-                # Bulk up User-Agent SQL Injection detection in the same function
+
+            # Bulk up User-Agent SQL Injection detection in the same function
             if self.t_ua_sql(url):
                 print("\n[Comprehensive Scan] Vulnerability: SQL User Agent Injection", "\nURL: ", url)
-            self.check_input_type(url)
 
+            # Scan inputs outside forms/with no actionable form
+            if self.t_i_sql_nfi(url):
+                print("\nVulnerability: ", 'SQL Injection - Time based', "\nURL: ", url)
             return
         except Exception as e:
             print("Something went wrong when testing SQL Injections. Please check error file.")
@@ -950,6 +984,24 @@ class Scanner(Utilities):
             print("[Error Info] LINK:", url, file=self.err_file)
             pass
 
+    def t_i_html_nfi(self, url):
+        try:
+            for html_payload in self.DataStorage.payloads("HTML"):
+                # Inject each payload into each injection point
+                response_injected = self.no_form_input_content(url, html_payload)
+                if not response_injected:
+                    return 0
+                # Check for html_payload (tags included) in response, success execution if available.
+                for response_inj in response_injected:
+                    if html_payload in response_inj.text:
+                        return True
+            return False
+        except Exception as e:
+            print("Something went wrong when testing HTML Injections with non-form inputs. Please check error file.")
+            print("\n[ERROR] Something went wrong when testing HTML Injection with non-form inputs. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
     def scan_html(self, url):
         try:
             form_list, form_data_list = self.extract_forms_and_form_data(url)
@@ -962,6 +1014,9 @@ class Scanner(Utilities):
                         print("Multiple other HTML Injection Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
                     else:
                         print("\n[Comprehensive Scan] Vulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
+            # Test on non-form inputs
+            if self.t_i_html_nfi(url):
+                print("\nVulnerability: HTML Injection non-form input", "\nURL: ", url)
         except Exception as e:
             print("Something went wrong when testing HTML Injections. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for HTML Injection. Error: ", e, file=self.err_file)
@@ -1012,12 +1067,33 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
             pass
 
+    def t_i_code_exec_nfi(self, url):
+        try:
+            # Detects blind and standard Code Exec (Ping for 3 seconds)
+            code_exec_payload = "| ping -c 3 127.0.0.1"
+            response_injected = self.no_form_input_content(url, code_exec_payload)
+            if not response_injected:
+                return 0
+            # Detect both blind and standard Code Execs.
+            for response_inj in response_injected:
+                if response_inj.elapsed.total_seconds() > 1.5:
+                    return True
+            return False
+        except Exception as e:
+            print("Something went wrong when testing for Code Execution Injection. Please check error file.")
+            print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
+            pass
+
     def scan_code_exec(self, url):
         try:
             form_list, form_data_list = self.extract_forms_and_form_data(url)
             for index, form in enumerate(form_list):
                 if self.t_i_code_exec(url, form, form_data_list[index]):
                     print("\nVulnerability: Code Execution", "\nURL: ", url, "\nFORMs: ", form)
+
+            # Non-form input
+            if self.t_i_code_exec_nfi(url):
+                print("\nVulnerability: Code Execution - non-form inputs", "\nURL: ", url)
         except Exception as e:
             print("Something went wrong when testing for Code Execution Injection. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
@@ -1071,18 +1147,37 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
             pass
 
+    def t_i_ssi_nfi(self, url):
+        try:
+            # Non-blind detection. Search for UNIX time format in response.
+            ssi_payload = '<!--#exec cmd=uptime -->'
+            response_injected = self.no_form_input_content(url, ssi_payload)
+            if not response_injected:
+                return 0
+            for response_inj in response_injected:
+                if re.findall('\d\d:\d\d:\d\d', str(response_inj.text)):
+                    return True
+            return False
+        except Exception as e:
+            print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
+            print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
+            pass
+
     def scan_ssi(self, url):
         try:
             form_list, form_data_list = self.extract_forms_and_form_data(url)
             for index, form in enumerate(form_list):
                 if self.t_i_ssi(url, form, form_data_list[index]):
                     print("\nVulnerability: SSI Code Execution in URL", "\nURL: ", url, "\nFORMs: ", form)
+            # Scan non-form inputs
+            if self.t_i_ssi_nfi(url):
+                print("\nVulnerability: SSI Code Execution in URL non-form inputs", "\nURL: ", url)
         except Exception as e:
             print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
             print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
             pass
 
-    def t_i_xml(self, url): # TODO: need way to dynamically identify XEE + add AJAX detection
+    def t_i_xml(self, url):
         try:
             ajax_xml_urls = self.extract_non_form_inputs(url)
             print(ajax_xml_urls)
@@ -1144,7 +1239,7 @@ class Scanner(Utilities):
     def scan_role_def_dir(self, url):
         try:
             if self.t_ba_role_definition_directories(url):
-                print("Vulnerability: Administrator roles defined in URLs!", "\nURL: ", url)
+                print("\nVulnerability: Administrator roles defined in URLs!", "\nURL: ", url)
         except Exception as e:
             print("Something went wrong when testing for role definition directories. Please check error file.")
             print("\n[ERROR] Something went wrong when testing for role definition directories. Error: ", e, file=self.err_file)
@@ -1194,7 +1289,7 @@ class Scanner(Utilities):
     def scan_browser_cache(self, url):
         try:
             if self.t_ba_browser_cache_weakness(url):
-                print("Vulnerability: Potential Browser Cache Weakness vulnerability identified. \nURL: ", url)
+                print("\nVulnerability: Potential Browser Cache Weakness vulnerability identified. \nURL: ", url)
         except Exception as e:
             print("\n[ERROR] Something went wrong when testing browser cache. Error: ", e, file=self.err_file)
             print("Something went wrong when testing browser cache. Please check error file.")
@@ -1224,7 +1319,7 @@ class Scanner(Utilities):
 
     # Cross Site Scripting
 
-    def test_xss(self, url, form, form_data):
+    def t_i_xss(self, url, form, form_data):
         try:
             confidence = 0
             injection_keys = self.extract_injection_fields_from_form(form_data)
@@ -1247,17 +1342,34 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
             pass
 
+    def t_i_xss_nfi(self, url):
+        try:
+            for xss_payload in self.DataStorage.payloads("XSS"):
+                response_injected = self.no_form_input_content(url, xss_payload)
+                if not response_injected:
+                    return False
+                for response_inj in response_injected:
+                    if xss_payload.lower() in response_inj.text.lower():
+                        return True
+            return False
+        except Exception as e:
+            print("\nSomething went wrong testing XSS in form.")
+            print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
+            pass
+
     def scan_xss(self, url):
         try:
             form_list, form_data_list = self.extract_forms_and_form_data(url)
             for index, form in enumerate(form_list):
-                xss_vuln, confidence = self.test_xss(url, form, form_data_list[index])
+                xss_vuln, confidence = self.t_i_xss(url, form, form_data_list[index])
                 if xss_vuln:
                     if 0 < confidence <= 3:
                         print("\nVulnerability: XSS Injection", "\nURL: ", url,"\nConfidence: ", confidence, "\nFORMs: ", form)
                         print("Multiple other XX Injection Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
                     else:
                         print("\n[Comprehensive Scan] Vulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
+            if self.t_i_xss_nfi(url):
+                print("\nVulnerability: XSS Injection - non-form input", "\nURL: ", url)
             return 0
         except Exception as e:
             print("\nSomething went wrong testing XSS in form.")
@@ -2092,7 +2204,7 @@ class CreateUserSession(Utilities):
 #         try:
 #             if test:
 #                 if form and url:
-#                     if self.test_xss_in_form(form, url):
+#                     if self.t_i_xss_in_form(form, url):
 #                         links_forms_dict_xss[url] = form
 #                     if self.test_sql(form, url):
 #                         links_forms_dict_sql_injection[url] = form
@@ -2103,7 +2215,7 @@ class CreateUserSession(Utilities):
 #                     if self.test_nosql(form, url):
 #                         links_forms_dict_nosql_injection[url] = form
 #                 elif "=" in url:
-#                     if self.test_xss_in_link(url):
+#                     if self.t_i_xss_in_link(url):
 #                         links_xss_link.append(url)
 #                     if self.t_i_html(url):
 #                         links_html_injection.append(url)
