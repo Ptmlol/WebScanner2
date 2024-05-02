@@ -657,7 +657,7 @@ class Utilities(ScanConfigParameters):
     def custom_user_agent(self, user_agent):
         try:
             # Create custom user-agent based on provided input
-            return {'User-Agent': "Scanner Agent'" + user_agent}
+            return {'User-Agent': user_agent}
         except Exception as e:
             print("Something went wrong. A HTTP error occurred. Please check error file.")
             print("\n[ERROR] Something went wrong when modifying the User-Agent. Error: ", e, file=self.err_file)
@@ -794,6 +794,18 @@ class Utilities(ScanConfigParameters):
             print("Error in no_form_input_content. Error: ", e, file=self.err_file)
             pass
 
+    def check_hidden_tag(self, url, form_data):
+        try:
+            inputs = self.extract_inputs(url)
+            for input in inputs:
+                if input['name'] in form_data:
+                    if input['type'] == 'hidden':
+                        return True
+            return False
+        except Exception as e:
+            print("[ERROR] Something went wrong when checking for hidden inputs. Please check error file!")
+            print("\n[ERROR] Something went wrong when checking for hidden inputs. Error: ", e, file=self.err_file)
+
 # Scanner class handles scan jobs
 class Scanner(Utilities):
     def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None, comprehensive_scan=None):
@@ -820,10 +832,11 @@ class Scanner(Utilities):
                 self.scan_sql(url)
                 self.scan_role_def_dir(url)
                 self.scan_role_def_cookie(url)
-                self.scan_browser_cache(url)
+                #self.scan_browser_cache(url) # Ok, just whole app is vuln
                 # self.scan_session(url) # TODO : Fix Strong Sessions
                 self.scan_xss(url)
-                # self.t_i_xml(url)
+                # self.t_i_xml(url) # TODO: Fix XML
+                self.scan_idor(url)
             return
         except Exception as e:
             print("Something went wrong when attempting to scan. Please check error file.")
@@ -918,7 +931,10 @@ class Scanner(Utilities):
             for sql_payload in self.DataStorage.payloads("SQL"):
                 # Inject headers with payloads
                 headers = self.custom_user_agent(sql_payload)
-                response = self.session.get(url, timeout=300, headers=headers)
+                try:
+                    response = self.session.get(url, timeout=300, headers=headers)
+                except Exception:
+                    continue
                 # Check response type (time or feedback)
                 if time_based is False and response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
                     time_based = True
@@ -1303,7 +1319,7 @@ class Scanner(Utilities):
                 if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(key).lower():
                     current_session = value
             for key, value in new_user_cookies.items():
-                if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(key).lower():
+                if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(key).lower() and current_session:
                     new_user.session.cookies[str(key)] = str(current_session)
                     print(new_user.session.cookies.get_dict()) # TODO: Find why session wont be chanced ffs and check alternative ways of identification
             new_user_response = new_user.session.get(url)
@@ -1357,6 +1373,24 @@ class Scanner(Utilities):
             print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
             pass
 
+    def t_ua_xss(self, url):
+        try:
+            for payload in self.DataStorage.payloads("XSS"):
+                # Inject headers with payloads
+                headers = self.custom_user_agent(payload)
+                try:
+                    response = self.session.get(url, timeout=300, headers=headers)
+                except Exception:
+                    continue
+                # Check response type (time or feedback)
+                if payload.lower() in response.text.lower():
+                    return True
+            return False
+        except Exception as e:
+            print("Something went wrong when testing for User-Agent XSS Injections. Please check error file.")
+            print("\n[ERROR] Something went wrong when testing for User-Agent XSS Injections. Error: ", e, file=self.err_file)
+            pass
+
     def scan_xss(self, url):
         try:
             form_list, form_data_list = self.extract_forms_and_form_data(url)
@@ -1365,17 +1399,60 @@ class Scanner(Utilities):
                 if xss_vuln:
                     if 0 < confidence <= 3:
                         print("\nVulnerability: XSS Injection", "\nURL: ", url,"\nConfidence: ", confidence, "\nFORMs: ", form)
-                        print("Multiple other XX Injection Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
+                        print("Multiple other XSS Injection Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
                     else:
                         print("\n[Comprehensive Scan] Vulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
             if self.t_i_xss_nfi(url):
                 print("\nVulnerability: XSS Injection - non-form input", "\nURL: ", url)
+            if self.t_ua_xss(url):
+                print("\nVulnerability: XSS Injection - User Agent", "\nURL: ", url)
             return 0
         except Exception as e:
             print("\nSomething went wrong testing XSS in form.")
             print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
             pass
 
+    # Insecure Direct Object References
+    def t_idor(self, url, form_data):
+        if self.check_hidden_tag(url, form_data):
+            return True
+        return False
+
+    def t_idor_nfi(self, url): # TODO: Modify IDOR to be generical
+        try:
+            attempts = 0
+            sub_string = re.findall('[?](.*)[=]*\d', url)
+            if sub_string:
+                index_from_url = int(str(re.findall('\d', str(sub_string))))
+                response = self.session.get(url)
+                while attempts < 10:
+                    try:
+                        url.replace(str(index_from_url), index_from_url + 1)
+                        response_2 = self.session.get(url)
+                        if response != response_2 and str(response_2.status_code).startswith("2"):
+                            return True
+                    except Exception:
+                        index_from_url += 1
+                        attempts += 1
+            return False
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when testing IDOR. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
+
+    def scan_idor(self, url):
+        try:
+            if self.t_idor_nfi(url):
+                print("\nVulnerability: Insecure direct object references (IDOR) - URL", "\nURL: ", url,"\nConfidence: ")
+            form_list, form_data_list = self.extract_forms_and_form_data(url)
+            for index, form in enumerate(form_list):
+                if self.t_idor(url, form_data_list[index]):
+                    print("\nPossible Insecure direct object references (IDOR) vulnerability in form.", "\nURL: ", url)
+            return
+        except Exception as e:
+            print("\n[ERROR] Something went wrong when scanning for IDOR. Error: ", e, file=self.err_file)
+            print("[Error Info] LINK:", url, file=self.err_file)
+            pass
 
 class CreateUserSession(Utilities):
     try:
@@ -1492,22 +1569,7 @@ class CreateUserSession(Utilities):
 
 
 
-    #
-    # def check_response(self, url):
-    #     try:
-    #         if self.session.post(url).status_code == 200:
-    #             return True
-    #         elif self.session.get(url).status_code == 200:
-    #             return True
-    #         elif str(self.session.get(url).status_code).startswith("3"):
-    #             return True
-    #         return False
-    #     except Exception as e:
-    #         if "toomanyredirects" in str(e).lower():
-    #             print("\n[WARN] Got too many redirects from an URL. This can be ignored.", file=self.error_file)
-    #             print("[Error Info] LINK:", url, file=self.error_file)
-    #             pass
-    #         return False
+
     #
 
     #
@@ -1526,21 +1588,7 @@ class CreateUserSession(Utilities):
     #         print("\n[ERROR] Something went wrong when checking hidden paths. Error: ", e, file=self.error_file)
     #         print("[Error Info]  Hidden Path:", h_path, file=self.error_file)
     #         pass
-    #
 
-    #
-    # def get_content(self, url, sess=None):
-    #     try:
-    #         if sess is None:
-    #             response = self.session.get(url)
-    #         else:
-    #             response = sess.get(url)
-    #         return response
-    #     except Exception as e:
-    #         print("\n[ERROR] Something went wrong when parsing content from link. Error: ", e, file=self.error_file)
-    #         print("[Error Info] LINK:", url, file=self.error_file)
-    #         pass
-    #
     # # Get Info
     # def fingerprint(self, url):
     #     try:
@@ -1556,12 +1604,7 @@ class CreateUserSession(Utilities):
     #         print("\n[ERROR] Something went wrong when searching for application server. Error: ", e, file=self.error_file)
     #         print("[Error Info] LINK:", url, file=self.error_file)
     #         pass
-    #
-    # def get_port(self):
-    #     # Get PORTS
-    #
-    # def get_port_info(self):
-    #     #Get PORTS and INFO
+
     #
     # def get_comments_dtds_scripts_from_content(self, url):
     #     try:
@@ -1591,11 +1634,6 @@ class CreateUserSession(Utilities):
 
 
 #     # Vulnerabilities
-#
-#     # A2:2017-Broken Authentication:
-#     # Above Class(LoginTestsVulns)
-#
-#
 #
 #     # A3:2017-Sensitive Data Exposure
 #     # checking certificate...
@@ -1681,38 +1719,8 @@ class CreateUserSession(Utilities):
 #             print("[???-???] Cannot check issuer of the TLS extension...", file=self.report_file)
 #             print("\n[ERROR] Something went wrong when checking TLS issuer. Most likely you don't have any certificate. Error: ", e, file=self.error_file)
 #             pass
-#
-#     def check_secure_tag_cookie_sessid(self, url):
-#         try:
-#             cookie_dict = self.extract_cookies(url)
-#             if "sid" or "sessionid" or "session" or "sessiontoken" or "sessid" in str(cookie_dict).lower():
-#                 if "secure" or not "httponly" not in str(cookie_dict).lower() or not "secure" and "httponly" not in str(cookie_dict).lower():
-#                     return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking secure tag on cookie session ID storage. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     def check_form_action(self, form):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Checking form action")
-#             except Exception:
-#                 pass
-#             action = form.get("action")
-#             if not action:
-#                 return False
-#             elif "http" in action and "https" not in action:
-#                 return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking form action. Error: ", e, file=self.error_file)
-#             print("[Error Info] FORM:", form, file=self.error_file)
-#             pass
-#
 
-#
+
 #     # A5:2017-Broken Access Control
 #     # Directory Traversal File Include # https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/File%20Inclusion#basic-lfi
 #
@@ -1898,33 +1906,7 @@ class CreateUserSession(Utilities):
 #             print("[Error Info] LINK:", url, file=self.error_file)
 #             pass
 #
-#     # Insecure Direct Object References
-#     def test_idor(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing IDOR")
-#             except Exception:
-#                 pass
-#             attempts = 0
-#             sub_string = re.findall('[?](.*)[=]*\d', url)
-#             if sub_string:
-#                 index_from_url = int(str(re.findall('\d', str(sub_string))))
-#                 response = self.session.get(url)
-#                 while attempts < 10:
-#                     try:
-#                         url.replace(str(index_from_url), index_from_url + 1)
-#                         response_2 = self.session.get(url)
-#                         if response != response_2 and str(response_2.status_code).startswith("2"):
-#                             return 1
-#                     except Exception as e:
-#                         print(e)
-#                         index_from_url += 1
-#                         attempts += 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing IDOR. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
+#
 #
 #     # A6:2017-Security Misconfigurations
 #     # Test File Extensions Handling for Sensitive Information
@@ -2109,9 +2091,6 @@ class CreateUserSession(Utilities):
 #             print("[Error Info] LINK:", url, file=self.error_file)
 #             print("[Error Info] FORM:", form, file=self.error_file)
 #             pass
-#
-#     # Test XSS
-#
 #
 #
 #     # Test LFI
@@ -2326,447 +2305,6 @@ class CreateUserSession(Utilities):
 #         except Exception as e:
 #             print("\n[ERROR] Something went wrong when testing Security Misconfiguration. Error: ", e, file=self.error_file)
 #             pass
-#
-#     # Print Info Method
-#
-#     def print_report(self):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Generating report")
-#             except Exception:
-#                 pass
-#             if server_set:
-#                 print("\n\n\t\t[DETAILED REPORT]\n", file=self.report_file)
-#                 print("\nServer/s Found: ", file=self.report_file)
-#                 print(*server_set, sep="\n", file=self.report_file)
-#                 print("\nServer/s Found Running on Web App:", file=self.map_file)
-#                 print(*server_set, sep="\n", file=self.map_file)
-#             else:
-#                 print("\n\n\t\t[DETAILED REPORT]\n", file=self.report_file)
-#                 print("\nServer Grab Test Performed", file=self.report_file)
-#                 print("[WARN] No server found!", file=self.report_file)
-#
-#             if comment_set:
-#                 print("\n[!!!-???] Comments inside HTML DOM found.", file=self.report_file)
-#                 print("Found comments inside HTML DOM. Make sure these comments do not contain any sensitive information.", file=self.report_file)
-#                 print(*comment_set, sep="\n", file=self.report_file)
-#                 print("[END] End of comments.", file=self.report_file)
-#             else:
-#                 print("\nComments Test Performed", file=self.report_file)
-#                 print("[WARN] No comments found inside DOM!", file=self.report_file)
-#
-#             if port_set:
-#                 print("\nPort/s Found on Web App:", file=self.map_file)
-#                 print(*port_set, sep="\n", file=self.map_file)
-#                 print("\nPort/s Found on Web App:", file=self.report_file)
-#                 print(*port_set, sep="\n", file=self.report_file)
-#             else:
-#                 print("\nPort Scan Test Performed", file=self.report_file)
-#                 print("[WARN] No information available!", file=self.report_file)
-#
-#             if dtd_url:
-#                 print("\n[!!!-???]Found Data Type Definition (DTD) URLs on links:", file=self.report_file)
-#                 print(*dtd_url, sep='\n', file=self.report_file)
-#                 print("[END] End of DTD URLs.", file=self.report_file)
-#             else:
-#                 print("\nDTD Detection Test Performed", file=self.report_file)
-#                 print("[WARN] No DTD found inside DOM!", file=self.report_file)
-#
-#             if script_set:
-#                 print("\nFound Javascript code inside HTML DOM:", file=self.report_file)
-#                 print(*script_set, sep='\n', file=self.report_file)
-#                 print("[END] End of JS code inside DOM.", file=self.report_file)
-#             else:
-#                 print("\nJavascript Code Detection Test Performed", file=self.report_file)
-#                 print("[WARN] No Javascript Code found inside DOM!", file=self.report_file)
-#
-#             if links_potential_role_definition:
-#                 print("\n[!!!---???] Possible Role Definition Vulnerability on Cookies for links:\n", file=self.report_file)
-#                 print(*links_potential_role_definition, sep="\n", file=self.report_file)
-#                 print("[END] End of Role Definition Vulnerable links", file=self.report_file)
-#             else:
-#                 print("\nCookies Role Definition Test Performed", file=self.report_file)
-#                 print("[WARN] No cookies with role storage found!", file=self.report_file)
-#
-#             if links_without_secure_cookie_with_sessid:
-#                 print("\n[!!!---!!!] Session ID Set in Cookie but cookie is not secure. It can be sent over unencrypted channels (HTTP) Links:\n", file=self.report_file)
-#                 print(*links_without_secure_cookie_with_sessid, sep="\n", file=self.report_file)
-#                 print("[END] End of Insecure Cookie With Session ID SET", file=self.report_file)
-#             else:
-#                 print("\nSessionID Secure Tag on Cookies Test Performed", file=self.report_file)
-#                 print("[WARN] No unsecure cookies found!", file=self.report_file)
-#
-#             if links_privilege_escal:
-#                 print("\n[!!!---!!!] Application is vulnerable to Vertical Privilege Escalation on links:\n", file=self.report_file)
-#                 print(*links_privilege_escal, sep="\n", file=self.report_file)
-#                 print("[END] End of Vertical Privilege Escalation vulnerable links", file=self.report_file)
-#             else:
-#                 print("\nPrivilege Escalation Test Performed", file=self.report_file)
-#                 print("[WARN] No privilege escalation vulnerability found!", file=self.report_file)
-#
-#             if links_browser_cache_weakness:
-#                 print("\n[!!!---!!!] Browser Cache Weakness Vulnerability on links:\n", file=self.report_file)
-#                 print(*links_browser_cache_weakness, sep="\n", file=self.report_file)
-#                 print("[END] End of Browser Cache Weakness Vulnerability", file=self.report_file)
-#             else:
-#                 print("\nBrowser Cache Weakness Test Performed", file=self.report_file)
-#                 print("[WARN] No Browser Cache Weakness found!", file=self.report_file)
-#
-#             if links_vulnerable_to_lfi:
-#                 print("\n[!!!---!!!] Local File Inclusion Vulnerability on links:\n", file=self.report_file)
-#                 print(*links_vulnerable_to_lfi, sep="\n", file=self.report_file)
-#                 print("[END] End of Local File Inclusion", file=self.report_file)
-#             else:
-#                 print("\nLFI Test Performed", file=self.report_file)
-#                 print("[WARN] No LFI found!", file=self.report_file)
-#
-#             if links_lfi_directory_transversal:
-#                 print("\n[!!!---!!!] Local File Inclusion Directory Transversal on links:\n", file=self.report_file)
-#                 print(*links_lfi_directory_transversal, sep="\n", file=self.report_file)
-#                 print("[END] End of Local File Inclusion Directory Transversal", file=self.report_file)
-#             else:
-#                 print("\nLFI Directory Transversal Test Performed", file=self.report_file)
-#                 print("[WARN] No LFI Directory Transversal vulnerability found!", file=self.report_file)
-#
-#             if links_cookie_directory_transversal:
-#                 print("\n[!!!---!!!] Cookies Local File Inclusion Directory Transversal  on links:\n", file=self.report_file)
-#                 print(*links_cookie_directory_transversal, sep="\n", file=self.report_file)
-#                 print("[END] End of Cookie Local File Inclusion Directory Transversal", file=self.report_file)
-#             else:
-#                 print("\nCookie Directory Transversal Test Performed", file=self.report_file)
-#                 print("[WARN] No Cookie Directory Transversal vulnerability found!", file=self.report_file)
-#
-#             if links_bypass_authorization:
-#                 print("\n[!!!---!!!] Bypassing Authorization Vulnerability:\n", file=self.report_file)
-#                 print("Horizontal Bypassing Authorization on links:\n", file=self.report_file)
-#                 print(*links_bypass_authorization, sep="\n", file=self.report_file)
-#             else:
-#                 print("\nBypassing Authorization Test Performed", file=self.report_file)
-#                 print("[WARN] No Bypassing Authorization vulnerability found!", file=self.report_file)
-#
-#             if links_special_header:
-#                 print("[!!!---!!!] Special Request Header Handling on links:\n", file=self.report_file)
-#                 print(*links_special_header, sep="\n", file=self.report_file)
-#                 print("[END] End of Bypassing Authorization Vulnerability", file=self.report_file)
-#             else:
-#                 print("\nSpecial Request Header Handling Test Performed", file=self.report_file)
-#                 print("[WARN] No Special Request Header Handling vulnerability found!", file=self.report_file)
-#
-#             if links_xee_vuln:
-#                 print("\n[!!!---!!!] XEE Vulnerability found on links:\n", file=self.report_file)
-#                 print(*links_xee_vuln, sep="\n", file=self.report_file)
-#                 print("[END] End of XEE Vulnerable links", file=self.report_file)
-#             else:
-#                 print("\nXEE Test Performed", file=self.report_file)
-#                 print("[WARN] No XEE found!", file=self.report_file)
-#
-#             if links_xss_link:
-#                 print("\n[!!!---!!!] XSS Vulnerability found on links:\n", file=self.report_file)
-#                 print(*links_xss_link, sep="\n", file=self.report_file)
-#                 print("[END] End of XSS Vulnerable links", file=self.report_file)
-#             else:
-#                 print("\nXSS on Links Test Performed", file=self.report_file)
-#                 print("[WARN] No XSS on Links found!", file=self.report_file)
-#
-#             if links_idor:
-#                 print("\n[!!!---!!!] Insecure Direct Object References on links:\n", file=self.report_file)
-#                 print(*links_idor, sep="\n", file=self.report_file)
-#                 print("[END] End of IDOR Links", file=self.report_file)
-#             else:
-#                 print("\nInsecure Direct Object References Test Performed", file=self.report_file)
-#                 print("[WARN] No Insecure Direct Object References found!", file=self.report_file)
-#
-#             if links_javascript_code:
-#                 print("\n[!!!---!!!] Javascript Code Execution Injection on links:\n", file=self.report_file)
-#                 print(*links_javascript_code, sep="\n", file=self.report_file)
-#                 print("[END] End of Javascript Code Execution Injection", file=self.report_file)
-#             else:
-#                 print("\nJavascript Code Execution Injection Test Performed", file=self.report_file)
-#                 print("[WARN] No Javascript Code Execution Injection found!", file=self.report_file)
-#
-#             if links_html_injection:
-#                 print("\n[!!!---!!!] HTML Injection on links:\n", file=self.report_file)
-#                 print(*links_html_injection, sep="\n", file=self.report_file)
-#                 print("[END] End of HTML Injection", file=self.report_file)
-#             else:
-#                 print("\nHTML Injection Test Performed", file=self.report_file)
-#                 print("[WARN] No HTML Injection found!", file=self.report_file)
-#
-#             if links_host_header_injection:
-#                 print("\n[!!!---!!!] Host Header Injection on links:\n", file=self.report_file)
-#                 print(*links_host_header_injection, sep="\n", file=self.report_file)
-#                 print("[END] End of Host Header Injection", file=self.report_file)
-#             else:
-#                 print("\nHost Header Injection Test Performed", file=self.report_file)
-#                 print("[WARN] No Host Header Injection found!", file=self.report_file)
-#
-#             if links_ssrf_injection:
-#                 print("\n[!!!---!!!] Server-Side Request Forgery Injection on links:\n", file=self.report_file)
-#                 print(*links_ssrf_injection, sep="\n", file=self.report_file)
-#                 print("[END] End of Server-Side Request Forgery Injection", file=self.report_file)
-#             else:
-#                 print("\nServer-Side Request Forgery Injection Test Performed", file=self.report_file)
-#                 print("[WARN] No Server-Side Request Forgery Injection found!", file=self.report_file)
-#
-#             # Form Dependent Vulnerabilities
-#
-#             print("\n\t\t[++]       Form Vulnerabilities       [++]\n", file=self.report_file)
-#
-#             if links_forms_dict_xss:
-#                 print("\n[!!!---!!!] XSS Vulnerabilities found:\n", file=self.report_file)
-#                 for link in links_forms_dict_xss:
-#                     print("Link:", link, "\nForm:\n", links_forms_dict_xss[link], file=self.report_file)
-#                     print("------", file=self.report_file)
-#             else:
-#                 print("\nXSS Test Performed", file=self.report_file)
-#                 print("[WARN] No XSS found!", file=self.report_file)
-#
-#             if links_forms_dict_file_upload:
-#                 print("\n[!!!---!!!] File Upload Vulnerabilities found:\n", file=self.report_file)
-#                 for link in links_forms_dict_file_upload:
-#                     print("Link:", link, "\nForm:\n", links_forms_dict_file_upload[link], file=self.report_file)
-#                     print("------", file=self.report_file)
-#             else:
-#                 print("\nFile Upload Test Performed", file=self.report_file)
-#                 print("[WARN] No File Upload vulnerability found!", file=self.report_file)
-#
-#             if links_forms_dict_code_exec:
-#                 print("\n[!!!---!!!] Code Execution Vulnerabilities found:\n", file=self.report_file)
-#                 for link in links_forms_dict_code_exec:
-#                     print("Link:", link, "\nForm:\n", links_forms_dict_code_exec[link], file=self.report_file)
-#                     print("------", file=self.report_file)
-#             else:
-#                 print("\nCode Execution Test Performed", file=self.report_file)
-#                 print("[WARN] No Code Execution vulnerability found!", file=self.report_file)
-#
-#             if links_forms_dict_ssi_injection:
-#                 print("\n[!!!---!!!] SSI Injection Vulnerability found:\n", file=self.report_file)
-#                 for link in links_forms_dict_ssi_injection:
-#                     print("Link:", link, "\nForm:\n", links_forms_dict_ssi_injection[link], file=self.report_file)
-#                     print("------", file=self.report_file)
-#             else:
-#                 print("\nSSI Injection Test Performed", file=self.report_file)
-#                 print("[WARN] No SSI Injection found!", file=self.report_file)
-#
-#             if links_forms_dict_sql_injection:
-#                 print("\n[!!!---!!!] SQL Injection Vulnerabilities found:\n", file=self.report_file)
-#                 for link in links_forms_dict_sql_injection:
-#                     print("Link:", link, "\nForm:\n", links_forms_dict_sql_injection[link], file=self.report_file)
-#                     print("[TIME]", file=self.report_file)
-#                     print("Without SQL Payload: ", sql_injection_dict_normal[link], "s", file=self.report_file)
-#                     print("With SQL Payload injected: ", sql_injection_dict_injected[link], "s", file=self.report_file)
-#                     print("------", file=self.report_file)
-#             else:
-#                 print("\nSQL Injection Test Performed", file=self.report_file)
-#                 print("[WARN] No SQL Injection found!", file=self.report_file)
-#
-#             if links_forms_dict_nosql_injection:
-#                 print("\n[!!!---!!!] NOSQL Injection Vulnerabilities found:\n", file=self.report_file)
-#                 for link in links_forms_dict_nosql_injection:
-#                     print("Link:", link, "\nForm:\n", links_forms_dict_nosql_injection[link], file=self.report_file)
-#                     print("[TIME]", file=self.report_file)
-#                     print("Without SQL Payload: ", nosql_injection_dict_normal[link], "s", file=self.report_file)
-#                     print("With SQL Payload injected: ", nosql_injection_dict_injected[link], "s", file=self.report_file)
-#                     print("------", file=self.report_file)
-#             else:
-#                 print("\nNOSQL Injection Test Performed", file=self.report_file)
-#                 print("[WARN] No NOSQL Injection found!", file=self.report_file)
-#
-#             if links_forms__dict_sensitive_info:
-#                 print("\n[!!!---!!!] Sensitive Information might be transferred over unsecure form:\n", file=self.report_file)
-#                 for link in links_forms__dict_sensitive_info:
-#                     print("Link:", link, "\nForm:\n", links_forms__dict_sensitive_info[link], file=self.report_file)
-#                     print("------", file=self.report_file)
-#             else:
-#                 print("\nSensitive Information over HTTP Test Performed", file=self.report_file)
-#                 print("[WARN] No Sensitive Information over HTTP found!", file=self.report_file)
-#
-#             if links_forms_files_in_form:
-#                 print("\n[!!!---!!!] Sensitive Information might be referenced in hidden form action:\n", file=self.report_file)
-#                 for link in links_forms_files_in_form:
-#                     print("Link:", link, "\nForm:\n", links_forms_files_in_form[link], file=self.report_file)
-#                     print("------", file=self.report_file)
-#             else:
-#                 print("\nSensitive Information reference in form action Test Performed", file=self.report_file)
-#                 print("[WARN] No Sensitive Information reference in form action found!", file=self.report_file)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when generation report. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def run_scanner(self):
-#         try:
-#             global final_list
-#             try:
-#                 my_gui.update_progress_bar(10)
-#             except Exception:
-#                 pass
-#             self.gather_info()
-#             self.test_broken_auth(test=(True if config_object['TEST']['test_broken_auth'].lower() == "true" else False))
-#             self.test_security_misconfiguration(test=(True if config_object['TEST']['test_security_misconfiguration'].lower() == "true" else False))
-#             self.test_sensitive_data_exposure(test=(True if config_object['TEST']['test_sensitive_data_exposure'].lower() == "true" else False))
-#             visible_links, final_list = self.create_return_merge_links()
-#             for count, link in enumerate(final_list):
-#                 try:
-#                     try:
-#                         my_gui.update_progress_bar(90/len(final_list))
-#                     except Exception:
-#                         pass
-#                     forms = self.extract_forms(link)
-#
-#                     # Info Gathering
-#                     self.gather_info(link)
-#
-#                     # Form Specific Tests
-#                     for form in forms:
-#                         print("Found form on links: " + link, file=self.map_file)
-#                         self.test_injections(link, form, test=(True if config_object['TEST']['test_injection'].lower() == "true" else False))
-#                         self.test_sensitive_data_exposure(link, form, test=(True if config_object['TEST']['test_sensitive_data_exposure'].lower() == "true" else False))
-#                         self.test_security_misconfiguration(link, form, test=(True if config_object['TEST']['test_security_misconfiguration'].lower() == "true" else False))
-#
-#                     # Test Suites
-#                     self.test_injections(link, test=(True if config_object['TEST']['test_injection'].lower() == "true" else False))
-#                     self.test_broken_auth(link, test=(True if config_object['TEST']['test_broken_auth'].lower() == "true" else False))
-#                     self.test_sensitive_data_exposure(link, test=(True if config_object['TEST']['test_sensitive_data_exposure'].lower() == "true" else False))
-#                     self.test_xml_external_entities(link, test=(True if config_object['TEST']['test_xml_external_entities'].lower() == "true" else False))
-#                     self.test_broken_access_control(link, test=(True if config_object['TEST']['test_broken_access_control'].lower() == "true" else False))
-#
-#                 except Exception as e:
-#                     print("\n[ERROR] Something went wrong when running scanner. Error: ", e, file=self.error_file)
-#                     pass
-#
-#             self.print_report()
-#             try:
-#                 my_gui.done_label()
-#             except Exception:
-#                 pass
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when running scanner. Error: ", e, file=self.error_file)
-#             pass
-#
-#
-# def main(report_file, map_file, error_file):
-#     try:
-#         print("\t\t\t\t\t\t[@@@]\t\t\tREPORT\t\t\t[@@@]\n\n", file=report_file)
-#         print("\n\t\t[LOGIN REPORT]", file=report_file)
-#         print("\t\t[ERROR REPORT]", file=error_file)
-#         try:
-#             my_gui.update_list_gui("Connecting to web application..")
-#         except Exception:
-#             pass
-#         ignored_list = [x.strip() for x in config_object["WEBURL"]["ignored"].split(',')]
-#         try:
-#             requests.get(config_object['WEBURL']['target'])
-#         except Exception as e:
-#             if 'did not properly respond after a period of time' in str(e):
-#                 try:
-#                     my_gui.update_list_gui("Cannot connect to application. Quitting..")
-#                     my_gui.cant_connect()
-#                     quit()
-#                 except Exception:
-#                     print("Cannot connect to application. Quitting..")
-#                     quit()
-#                     pass
-#
-#         if not config_object['WEBURL']['index']:
-#             config_object['WEBURL']['index'] = config_object['WEBURL']['target']
-#
-#         try_brute_force = LoginTests(
-#             config_object["CREDENTIAL"]["username"],
-#             config_object["WEBURL"]["login"],
-#             config_object["FILE"]["password_dict"],
-#             config_object["CREDENTIAL"]["wrong_username"],
-#             config_object["CREDENTIAL"]["known_password"],
-#             config_object["CREDENTIAL"]["certain_wrong_passwd"],
-#             config_object["WEBURL"]["logout"],
-#             report_file,
-#             error_file
-#         )
-#         found_password = try_brute_force.get_correct_password()
-#
-#         if found_password:
-#             vuln_scanner = Scanner(
-#                 config_object["WEBURL"]["target"],
-#                 ignored_list,
-#                 report_file,
-#                 map_file,
-#                 error_file
-#             )
-#             data_dict = {
-#                 config_object["CREDENTIAL"]["username_field"]: config_object["CREDENTIAL"]["username"],
-#                 config_object["CREDENTIAL"]["password_field"]: found_password,
-#                 config_object["CREDENTIAL"]["login_field"]: config_object["CREDENTIAL"]["submit_field"]
-#             }
-#             vuln_scanner.session.post(config_object["WEBURL"]["login"], data=data_dict)
-#             vuln_scanner.run_scanner()
-#         else:
-#             report_file.write("OK! No Password Found From BruteForce Test!" + "\nProceeding With Manual Input Password\n")
-#             print("[END LOGIN REPORT]", file=report_file)
-#             vuln_scanner = Scanner(
-#                 config_object["WEBURL"]["target"],
-#                 ignored_list,
-#                 report_file,
-#                 map_file,
-#                 error_file
-#             )
-#             data_dict = {
-#                 config_object["CREDENTIAL"]["username_field"]: config_object["CREDENTIAL"]["username"],
-#                 config_object["CREDENTIAL"]["password_field"]: config_object["CREDENTIAL"]["known_password"],
-#                 config_object["CREDENTIAL"]["login_field"]: config_object["CREDENTIAL"]["submit_field"]
-#             }
-#             vuln_scanner.session.post(config_object["WEBURL"]["login"], data=data_dict)
-#             vuln_scanner.run_scanner()
-#     except Exception as e:
-#         err_file = open('fatal_error.txt', 'w')
-#         print("\n[ERROR] Something went wrong in main function. Error: ", e, file=err_file)
-#         err_file.close()
-#         pass
-#
-#
-# def start_program():
-#     try:
-#         global report_dir_path
-#         # Create directory for report and files inside
-#         if config_object['FILE']['path_for_report_directory'] is None:
-#             output_path = os.getcwd()
-#         else:
-#             output_path = config_object['FILE']['path_for_report_directory']
-#         report_dir_path = os.path.join(output_path, 'Reports')
-#         try:
-#             os.mkdir(report_dir_path)
-#         except FileExistsError:
-#             pass
-#         # Clears files if exists
-#         report_path = os.path.join(report_dir_path, "Report.txt")
-#         open(report_path, 'w').close()
-#         architecture_path = os.path.join(report_dir_path, 'Web Application Map.txt')
-#         open(architecture_path, 'w').close()
-#         error_path = os.path.join(report_dir_path, 'Error Log.txt')
-#         open(error_path, 'w').close()
-#
-#         # Appends to emptied file
-#         rep_file = open(report_path, 'a')
-#         arch_file = open(architecture_path, 'a')
-#         err_file = open(error_path, 'a')
-#
-#         # Runs program
-#         main(rep_file, arch_file, err_file)
-#
-#         # Close files
-#         rep_file.close()
-#         arch_file.close()
-#         err_file.close()
-#     except Exception as e:
-#         err_file = open('fatal_error.txt', 'w')
-#         print("\n[ERROR] Something went wrong in start function. Error: ", e, file=err_file)
-#         err_file.close()
-#         pass
-#
-#
-#
-# start_program()
-
 
 if __name__ == '__main__':
     try:
