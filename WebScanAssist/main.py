@@ -4,6 +4,8 @@ import ssl
 import sys
 import time
 from io import UnsupportedOperation
+import json
+from colorama import Fore
 import requests
 import urllib.parse
 import urllib.request
@@ -241,7 +243,6 @@ firstCallSpider = 1
 #             pass
 
 
-
 class DataStorage:
     def __init__(self):
         self.xss_inj = None
@@ -282,7 +283,9 @@ class DataStorage:
                 f.close()
                 return self.xss_inj
         except Exception as e:
-            print("\n[ERROR] Something went wrong. Payload files cannot be read. Error:", e)
+            print(Fore.RED + "\n[ERROR] Something went wrong. Payload files cannot be read.")
+            print(Fore.RESET)
+            print("Error: ", e)
             pass
 
     def inject_type(self, p_type):
@@ -293,7 +296,9 @@ class DataStorage:
                     return key
             return None
         except Exception as e:
-            print("\n[ERROR] Something went wrong. Injection type cannot be resolved to this payload.", e)
+            print(Fore.RED + "\n[ERROR] Something went wrong. Injection type cannot be resolved to this payload")
+            print(Fore.RESET)
+            print("Error: ", e)
             pass
 
     # https://github.com/koutto/jok3r-pocs/blob/master/exploits/drupal-cve-2014-3704/exploit-drupal-cve-2014-3704.py
@@ -341,67 +346,79 @@ class DataStorage:
 
 
 class ScanConfigParameters:
-
     def __init__(self, url, ignored_links_path):
         try:
             # Initialize Scanner Configuration Parameters.
             self.url = url
-            # Session for current run
+            # Initialize Session for current run
             self.session = requests.Session()
-            # Init Data storage.
+            # Initialize Data Storage.
             self.DataStorage = DataStorage()
+            # Setup initial requirements and prepare files.
+            self.setup(ignored_links_path)
+        except Exception:
+            print(Fore.RED + "\n[ERROR] Something went wrong during initialization. Quitting..\n")
+            print(Fore.RESET)
+            print("Error: ", e)
+            quit()
 
-            try:
-                # Test connection
-                test_get = self.session.get(self.url)
-                if test_get.status_code == 404:
-                    print("Bad URL provided. Quitting..")
-                    quit()
-            except requests.ConnectionError as e:
-                try:
-                    self.url = self.url.replace("https://", "http://")  # Change to HTTP if HTTPs unsupported
-                    self.session.get(self.url)
-                except requests.ConnectionError:
-                    self.url = self.url.replace("http://", "https://")  # Change to HTTPs if HTTP unsupported
-                    self.session.get(self.url)
-            except Exception as e:
-                print("[ERROR] Something went establishing HTTP session. Error: ", e)
+    def setup(self, ignored_links_path):
+        try:  # Test connection
+            test_get = self.session.get(self.url)
+            if test_get.status_code == 404: # If page is not found, scanner will not start.
+                print("[Error] Bad URL provided (404). Quitting..")
                 quit()
-
-            try:
-                # Try to read an exiting error file, create one is none is found.
-                self.err_file = open('err_file.log', 'a')
-                # Check if file is empty before writing.
-                if os.stat('err_file.log').st_size == 0:
-                    self.err_file.write("Error File\n")
-            except Exception:
-                print("Something went wrong when opening the Error File")
-                quit()
-
-            try:
-                #  Try to read an existing link Ignore file, create one if none is found.
-                self.ignored_links = open(ignored_links_path + '/linkignore.log', 'r')
-                # Check if file is empty before writing.
-                if os.stat(ignored_links_path + '/linkignore.log').st_size == 0:
-                    self.ignored_links.write("www.exampleurl.com")
-                # Add the ignored links to a class variable
-                self.ignored_links = self.ignored_links.read()
-            except Exception as e:
-                print("Something went wrong when opening the Ignored Links file. Please check Error File")
-                print("\n[ERROR] Something went opening the Ignored Links file. Error: ", e, file=self.err_file)
-                print("[Error Info] URL:", self.url, file=self.err_file)
-                quit()
+        except requests.ConnectionError: # If ConnectionError identified, try to change the HTTP protocol.
+            try: # Switch to HTTP if HTTPs is unsupported
+                self.url = self.url.replace("https://", "http://")
+                self.session.get(self.url)
+            except requests.ConnectionError: # Switch to HTTPs if HTTP is unsupported
+                self.url = self.url.replace("http://", "https://")
+                self.session.get(self.url)
         except Exception as e:
-            print("Something went wrong. Please check error file", e)
-            print("\n[ERROR] Something went wrong when initializing tests. Error: ", e, file=self.err_file)  # Write
-            # Errors to File.
-            print("[Error Info] URL:", self.url, file=self.err_file)
+            print(Fore.RED + "\n[ERROR] Something went wrong while testing the initial connection. Quitting..\n")
+            print(Fore.RESET)
+            print("Error: ", e)
+            quit()
+
+        try:  # Create Error file
+            # Try to read an exiting error file, create one is none is found.
+            self.err_file = open('err_file.log', 'a')
+            # Check if file is empty before writing.
+            if os.stat('err_file.log').st_size == 0:
+                self.err_file.write("Error File\n")
+        except Exception as e:
+            print(Fore.RED + "\n[ERROR] Something went wrong when opening the Error File. Quitting..\n")
+            print(Fore.RESET)
+            print("Error: ", e)
+            quit()
+
+        try:  # Link Ignore file # TODO: or change to a config
+            #  Try to read an existing link Ignore file, create one if none is found.
+            self.ignored_links = open(ignored_links_path + '/linkignore.log', 'r')
+            # Check if file is empty before writing.
+            if os.stat(ignored_links_path + '/linkignore.log').st_size == 0:
+                self.ignored_links.write("www.example_url.com")
+            # Add the ignored links to a class variable
+            self.ignored_links = self.ignored_links.read()
+        except Exception as e:
+            print(Fore.RED + "\n[ERROR] Something went wrong when opening the Ignored Links file. Quitting..\n")
+            print(Fore.RESET)
+            print("Error: ", e)
+            quit()
+
+        try:  # Report file
+            # Try to read an exiting report file, create one is none is found.
+            self.report_file = open('report.json', 'a')
+        except Exception as e:
+            print(Fore.RED + "\n[ERROR] Something went wrong when opening the Report File. Quitting..\n")
+            print(Fore.RESET)
+            print("Error: ", e)
             quit()
 
 
 class Utilities(ScanConfigParameters):
-
-    def __init__(self, url, ignored_links_path, username=None, password=None):  # Inherits Parameters from Config Class
+    def __init__(self, url, ignored_links_path, username=None, password=None):  # Inherits Config Class
         ScanConfigParameters.__init__(self, url, ignored_links_path)
 
     def process_login(self, username, password, sec_level=None):
@@ -416,8 +433,7 @@ class Utilities(ScanConfigParameters):
                     print("Login Failed. Make sure you provided the right credentials.")
                     quit()
         except Exception as e:
-            print("Something went wrong when attempting to login. Please check error file.")
-            print("\n[ERROR] Something went wrong when cattempting to login. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when attempting to process the login.")
             quit()
 
     def extract_do_login(self, url, username, password, sec_level=None):
@@ -449,8 +465,7 @@ class Utilities(ScanConfigParameters):
                     return True
             return False
         except Exception as e:
-            print("Something went wrong when attempting to extract the login details. Please check error file.")
-            print("\n[ERROR] Something went attempting to extract the login details. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when attempting to extract the login details. Quitting..", url)
             quit()
 
     def check_sec_input(self, sec_level):
@@ -461,8 +476,7 @@ class Utilities(ScanConfigParameters):
                 self.check_sec_input(sec_level)
             return sec_level
         except Exception as e:
-            print("Something went wrong when checking security level. Please check error file.")
-            print("\n[ERROR] Something went checking security level. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when checking security level (BWapp).")
             pass
 
     def spider(self, url):
@@ -498,20 +512,16 @@ class Utilities(ScanConfigParameters):
                 # TODO: Create site map.
                 pass
             return
-        except Exception as e:  # TODO: Add colors to errors maybe
-            print("Something went wrong. Please check error file.")
-            print("\n[ERROR] Something went wrong when crawling for links. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when crawling for links.", url)
             pass
 
     def extract_headers(self, url):
         try:
             # Get headers of an URL.
             return self.session.get(url).headers
-        except Exception as e:  # Refine errors
-            print("Something went wrong. Please check error file.")
-            print("\n[ERROR] Something went wrong when getting the headers. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when getting the headers.", url)
             pass
 
     def extract_forms(self, url):
@@ -519,20 +529,16 @@ class Utilities(ScanConfigParameters):
             # Extract all forms from an URL.
             response = self.session.get(url, timeout=300)
             response.raise_for_status()
-            parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
+            parsed_html = BeautifulSoup(response.content, "html.parser")
             return parsed_html.findAll("form")
         except requests.HTTPError as e:
-            print("Something went wrong. A HTTP error occurred. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting forms from links. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting forms from links. A HTTP error occurred.", url)
+            pass
         except Exception as e:
-            print("Something went wrong. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting forms from links. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting forms from links.", url)
             pass
 
-    @staticmethod
-    def extract_form_details(form):
+    def extract_form_details(self, form):
         form_data = {}
         try:
             # Extract input fields and their names from the form
@@ -541,7 +547,7 @@ class Utilities(ScanConfigParameters):
                 if field.get('name'):
                     form_data[field.get('name')] = '' # might need back field.get('value', '')
         except Exception as e:
-            print("Exception reached in Extract Form Details", e)
+            self.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
 
         try:
@@ -551,7 +557,7 @@ class Utilities(ScanConfigParameters):
                 if field.get('name'):
                     form_data[field.get('name')] = field.get('value', 'submit')
         except Exception as e:
-            print("Exception reached in Extract Form Details", e)
+            self.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
 
         try:
@@ -561,7 +567,7 @@ class Utilities(ScanConfigParameters):
                 if field.get('name'):
                     form_data[field.get('name')] = ''
         except Exception as e:
-            print("Exception reached in Extract Form Details", e)
+            self.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
 
         try:
@@ -571,7 +577,7 @@ class Utilities(ScanConfigParameters):
                 if field.get('name'):
                     form_data[field.get('name')] = ''
         except Exception as e:
-            print("Exception reached in Extract Form Details", e)
+            self.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
         return form_data
 
@@ -583,13 +589,10 @@ class Utilities(ScanConfigParameters):
             parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
             return parsed_html.findAll("iframe")
         except requests.HTTPError as e:
-            print("Something went wrong. A HTTP error occurred. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting iframes from links. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting iframes from links. A HTTP error occurred", url)
+            pass
         except Exception as e:
-            print("Something went wrong. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting iframes from links. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting iframes from links.", url)
             pass
 
     def extract_inputs(self, url):
@@ -600,29 +603,24 @@ class Utilities(ScanConfigParameters):
             parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
             return parsed_html.findAll("input")
         except requests.HTTPError as e:
-            print("Something went wrong. A HTTP error occurred. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting inputs from links. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting inputs from links. A HTTP error occurred", url)
+            pass
         except Exception as e:
-            print("Something went wrong. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting inputs from links. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting inputs from links.", url)
             pass
 
-    @staticmethod
-    def build_iframe_url(url, iframe, payload):
-        try: # TODO: Check if URL needs shadow copy as well (currently seems like not)
-            # Get the src value of the iframe to get the destination of the payload.
+    def build_iframe_url(self, url, iframe, payload):
+        try:  # Get the src value of the iframe to get the destination of the payload.
+            url = url.copy()
             if iframe['src'] in url:
                 url = url.replace(iframe['src'], payload)
                 return url
             return None
         except Exception as e:
-            print("Exception reached in Extract iFrame Details", e)
+            self.print_except_message('error', e, "Something went wrong when building iframe URL.", url)
             pass
 
     def submit_form(self, url, form, form_data):
-
         try:
             # Get the action (URL or PATH)
             action = form.get("action")
@@ -645,13 +643,10 @@ class Utilities(ScanConfigParameters):
             response.raise_for_status()
             return response
         except requests.HTTPError as e:
-            print("Something went wrong. A HTTP error occurred. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting forms from links. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when submitting a form. A HTTP error occurred", url)
+            pass
         except Exception as e:
-            print("\n[ERROR] Something went wrong when submitting the form. Error: ", e, file=self.err_file)
-            print("[Error Info] FORM:", form, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when submitting a form.", url)
             pass
 
     def custom_user_agent(self, user_agent):
@@ -659,8 +654,7 @@ class Utilities(ScanConfigParameters):
             # Create custom user-agent based on provided input
             return {'User-Agent': user_agent}
         except Exception as e:
-            print("Something went wrong. A HTTP error occurred. Please check error file.")
-            print("\n[ERROR] Something went wrong when modifying the User-Agent. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when modifying the User-Agent.")
             pass
 
     def extract_injection_fields_from_form(self, form_data):
@@ -674,8 +668,7 @@ class Utilities(ScanConfigParameters):
                     keys_to_populate.append(key)
             return keys_to_populate
         except Exception as e:
-            print("Something went wrong. A HTTP error occurred. Please check error file.")
-            print("\n[ERROR] Something went wrong when extracting the empty values from forms. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting the empty inputs from a form.")
             pass
 
     def extract_name_value(self, form_data):
@@ -684,14 +677,14 @@ class Utilities(ScanConfigParameters):
                 return form_data['name']
             return 0
         except Exception as e:
-            print("\n[ERROR] Something went wrong when extracting name value from form. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting name value from a form.")
             pass
 
     def extract_cookies(self):
         try:
             return self.session.cookies.get_dict()
         except Exception as e:
-            print("\n[ERROR] Something went wrong when saving cookies. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when saving cookies.")
             pass
 
     def check_scan_build_url(self, url, username=None, password=None, static_scan=None, sec_level=None):
@@ -722,8 +715,7 @@ class Utilities(ScanConfigParameters):
                     elif self.process_login(username, password, sec_level):
                         self.DataStorage.urls.append(url)
         except Exception as e:
-            print("\n[ERROR] Something went wrong when checking login and scan required. Error: ", e,
-                  file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when checking for login requirements or scan options. Quitting..")
             quit()
 
     def extract_non_form_inputs(self, url):
@@ -737,7 +729,8 @@ class Utilities(ScanConfigParameters):
                 action_urls.append(str(url + '?' + str(name) + '='))
             return action_urls
         except Exception as e:
-            print("\n[ERROR] Something went wrong when extracting non-form inputs. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e,"Something went wrong when extracting non-form inputs", url)
+            pass
 
     def extract_forms_and_form_data(self, url):
         try:
@@ -754,9 +747,10 @@ class Utilities(ScanConfigParameters):
                 form_data_list.append(form_data)
             return form_list, form_data_list
         except Exception as e:
-            print("\n[ERROR] Something went wrong when extracting form and form_data. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting form and form data", url)
+            pass
 
-    def no_form_input_content(self, url, payload): # TODO: Need to get the .JS from sources also to work flawlessly
+    def no_form_input_content(self, url, payload):  # TODO: Need to get the .JS from sources also to work flawlessly
         try:
             # Extract inputs outside of form or with no method/action in form
             input_list_fin = set()
@@ -790,8 +784,7 @@ class Utilities(ScanConfigParameters):
                     response_list.append(self.session.post(new_url, params=form_data))
             return response_list
         except Exception as e:
-            print("Error in no_form_input_content.", e)
-            print("Error in no_form_input_content. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when extracting inputs outside of forms or with forms with no method.", url)
             pass
 
     def check_hidden_tag(self, url, form_data):
@@ -803,8 +796,43 @@ class Utilities(ScanConfigParameters):
                         return True
             return False
         except Exception as e:
-            print("[ERROR] Something went wrong when checking for hidden inputs. Please check error file!")
-            print("\n[ERROR] Something went wrong when checking for hidden inputs. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when checking for hidden inputs.", url)
+            pass
+
+    def print_except_message(self, m_type, error=None, custom_message=None, url=None):
+        try:
+            if m_type == 'warning':
+                if error:
+                    if custom_message:
+                        print(Fore.LIGHTRED_EX + "\n[WARNING] " + custom_message)
+                        print(Fore.RESET)
+                        print(error)
+                    else:
+                        print(Fore.LIGHTRED_EX + "\n[WARNING] " + error)
+                else:
+                    if custom_message:
+                        print(Fore.LIGHTRED_EX + "\n[WARNING] " + custom_message)
+
+            if m_type == 'error':
+                if error:
+                    if custom_message:
+                        print(Fore.RED + "\n[ERROR] " + custom_message + "\nPlease check the Error file for additional details.")
+                        if url:
+                            print(Fore.RED + "\n[ERROR] URL:" + url + "\nDetails: " + custom_message + "\nError Details: " + error, file=self.err_file)
+                        else:
+                            print(Fore.RED + "\n[ERROR] " + "\nDetails: " + custom_message + "\nError Details: " + error, file=self.err_file)
+                    else:
+                        print(Fore.RED + "\n[ERROR] Please check the Error file for additional details.")
+                        if url:
+                            print(Fore.RED + "\n[ERROR] URL:" + url + "\nError Details: " + error, file=self.err_file)
+                        else:
+                            print(Fore.RED + "\n[ERROR] " + error, file=self.err_file)
+            print(Fore.RESET)
+        except Exception:
+            print(Fore.RED + "[ERROR] Something went wrong when printing to Error File.")
+            print(Fore.RESET)
+            pass
+
 
 # Scanner class handles scan jobs
 class Scanner(Utilities):
@@ -839,13 +867,10 @@ class Scanner(Utilities):
                 self.scan_idor(url)
             return
         except Exception as e:
-            print("Something went wrong when attempting to scan. Please check error file.")
-            print("\n[ERROR] Something went wrong when attempting to initialize scan function. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when attempting to initialize scan function. Quitting..")
             quit()
 
-    # Injections
-
-    # SQL Injection (Form inputs, non-form inputs) (time based and generic)
+# Injections
 
     def t_i_sql(self, url, form, form_data):
         try:
@@ -900,9 +925,7 @@ class Scanner(Utilities):
                     return True, sql_type_list, confidence
             return False, [], 0
         except Exception as e:
-            print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
-            print("[Error Info] FORM:", form, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)
             pass
 
     def t_i_sql_nfi(self, url):
@@ -918,8 +941,7 @@ class Scanner(Utilities):
                         return True
             return False
         except Exception as e:
-            print("\n[ERROR] Something went wrong when testing for SQL Injection with no form inputs. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for SQL Injection with no form inputs.", url)
             pass
 
     def t_ua_sql(self, url):
@@ -943,8 +965,7 @@ class Scanner(Utilities):
                     return True
             return False
         except Exception as e:
-            print("Something went wrong when testing for User-Agent SQL Injections. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for User-Agent SQL Injections. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e,"Something went wrong when testing for User-Agent SQL Injection.", url)
             pass
 
     def scan_sql(self, url):
@@ -970,8 +991,7 @@ class Scanner(Utilities):
                 print("\nVulnerability: ", 'SQL Injection - Time based', "\nURL: ", url)
             return
         except Exception as e:
-            print("Something went wrong when testing SQL Injections. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for SQL Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)
             pass
 
     def t_i_html(self, url, form, form_data):
@@ -995,9 +1015,7 @@ class Scanner(Utilities):
                     return True, confidence
             return False, 0
         except Exception as e:
-            print("Something went wrong when testing HTML Injections. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing HTML Injection. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing HTML Injection.", url)
             pass
 
     def t_i_html_nfi(self, url):
@@ -1013,9 +1031,7 @@ class Scanner(Utilities):
                         return True
             return False
         except Exception as e:
-            print("Something went wrong when testing HTML Injections with non-form inputs. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing HTML Injection with non-form inputs. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing HTML Injection with non-form inputs.", url)
             pass
 
     def scan_html(self, url):
@@ -1034,8 +1050,7 @@ class Scanner(Utilities):
             if self.t_i_html_nfi(url):
                 print("\nVulnerability: HTML Injection non-form input", "\nURL: ", url)
         except Exception as e:
-            print("Something went wrong when testing HTML Injections. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for HTML Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing HTML Injection.", url)
             pass
 
     def t_i_iframe(self, url, iframe):
@@ -1049,8 +1064,7 @@ class Scanner(Utilities):
                     print("\nVulnerability: iFrame Injection", "\nURL: ", url, "\nIFrame: ", iframe)
             return
         except Exception as e:
-            print("Something went wrong when testing for iFrame Injection. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for iFrame Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
             pass
 
     def scan_iframe(self, url):
@@ -1059,8 +1073,7 @@ class Scanner(Utilities):
             for iframe in self.extract_iframes(url):
                 self.t_i_iframe(url, iframe)
         except Exception as e:
-            print("Something went wrong when testing for iFrame Injection. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for iFrame Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
             pass
 
     def t_i_code_exec(self, url, form, form_data):  # TODO: maybe add more payloads
@@ -1079,8 +1092,7 @@ class Scanner(Utilities):
                 return True
             return False
         except Exception as e:
-            print("Something went wrong when testing for Code Execution Injection. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for Code Execution Injection.", url)
             pass
 
     def t_i_code_exec_nfi(self, url):
@@ -1096,8 +1108,7 @@ class Scanner(Utilities):
                     return True
             return False
         except Exception as e:
-            print("Something went wrong when testing for Code Execution Injection. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for Code Execution Injection in non-form inputs.", url)
             pass
 
     def scan_code_exec(self, url):
@@ -1111,8 +1122,7 @@ class Scanner(Utilities):
             if self.t_i_code_exec_nfi(url):
                 print("\nVulnerability: Code Execution - non-form inputs", "\nURL: ", url)
         except Exception as e:
-            print("Something went wrong when testing for Code Execution Injection. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for Code Execution Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for Code Execution Injection.", url)
             pass
 
     def t_i_php_exec(self, url):
@@ -1133,8 +1143,7 @@ class Scanner(Utilities):
                 return True
             return False
         except Exception as e:
-            print("Something went wrong when testing for PHP Injection. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for PHP Code Execution Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for PHP Code Execution Injection.", url)
             pass
 
     def scan_php_exec(self, url):
@@ -1142,8 +1151,7 @@ class Scanner(Utilities):
             if self.t_i_php_exec(url):
                 print("\nVulnerability: PHP Code Execution in URL", "\nURL: ", url)
         except Exception as e:
-            print("Something went wrong when testing for PHP Injection. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for PHP Code Execution Injection. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for PHP Code Execution Injection.", url)
             pass
 
     def t_i_ssi(self, url, form, form_data):
@@ -1159,8 +1167,7 @@ class Scanner(Utilities):
                 return 0
             return re.findall('\d\d:\d\d:\d\d', str(response.text))
         except Exception as e:
-            print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for SSI (Server-Side Includes).", url)
             pass
 
     def t_i_ssi_nfi(self, url):
@@ -1175,8 +1182,7 @@ class Scanner(Utilities):
                     return True
             return False
         except Exception as e:
-            print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for SSI (Server-Side Includes) in non-form inputs.", url)
             pass
 
     def scan_ssi(self, url):
@@ -1189,8 +1195,7 @@ class Scanner(Utilities):
             if self.t_i_ssi_nfi(url):
                 print("\nVulnerability: SSI Code Execution in URL non-form inputs", "\nURL: ", url)
         except Exception as e:
-            print("Something went wrong when testing for SSI (Server-Side Includes). Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for SSI (Server-Side Includes). Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for SSI (Server-Side Includes).", url)
             pass
 
     def t_i_xml(self, url):
@@ -1203,11 +1208,10 @@ class Scanner(Utilities):
             #         return True
             return False
         except Exception as e:
-            print("\n[ERROR] Something went wrong when testing XML Injection. Error: ", e, file=self.err_file)
-            print("Something went wrong when testing for XML Injection. Please check error file.")
+            self.print_except_message('error', e, "Something went wrong when testing for XML Injection.", url)
             pass
 
-    # Broken Authentication & Session Mgmnt
+# Broken Authentication & Session Mgmt
 
     def t_ba_role_definition_cookie(self):
         try:
@@ -1227,8 +1231,7 @@ class Scanner(Utilities):
                     return True
             return False
         except Exception as e:
-            print("Something went wrong when testing for role definition on cookies. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for role definition on cookies. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for role definition on cookies.")
             pass
 
     def scan_role_def_cookie(self, url):
@@ -1236,9 +1239,7 @@ class Scanner(Utilities):
             if self.t_ba_role_definition_cookie():
                 print("\nVulnerability: Administrator roles defined in Cookie! Session can be hijacked!", "\nURL: ", url)
         except Exception as e:
-            print("Something went wrong when testing for role definition on cookies. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for role definition on cookies. Error: ", e,
-                  file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for role definition on cookies.", url)
             pass
 
     def t_ba_role_definition_directories(self, url):
@@ -1248,8 +1249,7 @@ class Scanner(Utilities):
                 return True
             return False
         except Exception as e:
-            print("Something went wrong when testing for role definition directories. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for role definition directories. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for role definition directories.", url)
             pass
 
     def scan_role_def_dir(self, url):
@@ -1257,8 +1257,7 @@ class Scanner(Utilities):
             if self.t_ba_role_definition_directories(url):
                 print("\nVulnerability: Administrator roles defined in URLs!", "\nURL: ", url)
         except Exception as e:
-            print("Something went wrong when testing for role definition directories. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for role definition directories. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for role definition directories.", url)
             pass
 
     def t_ba_session(self, url):
@@ -1269,8 +1268,7 @@ class Scanner(Utilities):
                     return True, cookie_dict
             return False, None
         except Exception as e:
-            print("\n[ERROR] Something went wrong when checking presence of session. Error: ", e, file=self.err_file)
-            print("Something went wrong when checking presence of session. Please check error file.")
+            self.print_except_message('error', e, "Something went wrong when checking the session.", url)
             pass
 
     def scan_session(self, url):
@@ -1278,14 +1276,13 @@ class Scanner(Utilities):
             session_vuln, curr_session_cookies = self.t_ba_session(url)
             if session_vuln:
                 if self.t_ba_strong_session(url, curr_session_cookies):
-                    print("\nVulnerability: Session is not secure. Session successfuly Hijacked. \nURL: ",
+                    print("\nVulnerability: Session is not secure. Session successfully Hijacked. \nURL: ",
                           url)
                 else:
                     print("\nVulnerability: Session not secure...(HTTP only). Session Hijacking might be possible. \nURL: ",
                           url)
         except Exception as e:
-            print("\n[ERROR] Something went wrong when checking presence of session. Error: ", e, file=self.err_file)
-            print("Something went wrong when checking presence of session. Please check error file.")
+            self.print_except_message('error', e, "Something went wrong when checking the session.", url)
             pass
 
     def t_ba_browser_cache_weakness(self, url):
@@ -1298,8 +1295,7 @@ class Scanner(Utilities):
                     return False
             return True
         except Exception as e:
-            print("\n[ERROR] Something went wrong when testing browser cache. Error: ", e, file=self.err_file)
-            print("Something went wrong when testing browser cache. Please check error file.")
+            self.print_except_message('error', e, "Something went wrong when testing browser cache.", url)
             pass
 
     def scan_browser_cache(self, url):
@@ -1307,8 +1303,7 @@ class Scanner(Utilities):
             if self.t_ba_browser_cache_weakness(url):
                 print("\nVulnerability: Potential Browser Cache Weakness vulnerability identified. \nURL: ", url)
         except Exception as e:
-            print("\n[ERROR] Something went wrong when testing browser cache. Error: ", e, file=self.err_file)
-            print("Something went wrong when testing browser cache. Please check error file.")
+            self.print_except_message('error', e, "Something went wrong when testing browser cache.", url)
             pass
 
     def t_ba_strong_session(self, url, cookies):
@@ -1323,17 +1318,16 @@ class Scanner(Utilities):
                     new_user.session.cookies[str(key)] = str(current_session)
                     print(new_user.session.cookies.get_dict()) # TODO: Find why session wont be chanced ffs and check alternative ways of identification
             new_user_response = new_user.session.get(url)
-            print("old", cookies)
-            #print(new_user.session.cookies.get_dict())
+            # print("old", cookies)
+            # print(new_user.session.cookies.get_dict())
             # if 'login' not in new_user_response.url.lower():
             #     return True
             return False
         except Exception as e:
-            print("\n[ERROR] Something went wrong when testing for strong sessions. Error: ", e, file=self.err_file)
-            print("Something went wrong when testing for strong sessions. Please check error file.")
+            self.print_except_message('error', e, "Something went wrong when testing for strong sessions.", url)
             pass
 
-    # Cross Site Scripting
+# Cross Site Scripting
 
     def t_i_xss(self, url, form, form_data):
         try:
@@ -1354,8 +1348,7 @@ class Scanner(Utilities):
                     return True, confidence
             return False, 0
         except Exception as e:
-            print("\nSomething went wrong testing XSS in form.")
-            print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong testing XSS in form.", url)
             pass
 
     def t_i_xss_nfi(self, url):
@@ -1369,8 +1362,7 @@ class Scanner(Utilities):
                         return True
             return False
         except Exception as e:
-            print("\nSomething went wrong testing XSS in form.")
-            print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong testing XSS in form.", url)
             pass
 
     def t_ua_xss(self, url):
@@ -1387,8 +1379,7 @@ class Scanner(Utilities):
                     return True
             return False
         except Exception as e:
-            print("Something went wrong when testing for User-Agent XSS Injections. Please check error file.")
-            print("\n[ERROR] Something went wrong when testing for User-Agent XSS Injections. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing for User-Agent XSS Injections.", url)
             pass
 
     def scan_xss(self, url):
@@ -1408,15 +1399,18 @@ class Scanner(Utilities):
                 print("\nVulnerability: XSS Injection - User Agent", "\nURL: ", url)
             return 0
         except Exception as e:
-            print("\nSomething went wrong testing XSS in form.")
-            print("\n[ERROR] Something went wrong testing XSS in form. Error: ", e, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong testing XSS in form.", url)
             pass
 
-    # Insecure Direct Object References
+# Insecure Direct Object References
     def t_idor(self, url, form_data):
-        if self.check_hidden_tag(url, form_data):
-            return True
-        return False
+        try:
+            if self.check_hidden_tag(url, form_data):
+                return True
+            return False
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing IDOR.", url)
+            pass
 
     def t_idor_nfi(self, url): # TODO: Modify IDOR to be generical
         try:
@@ -1436,8 +1430,7 @@ class Scanner(Utilities):
                         attempts += 1
             return False
         except Exception as e:
-            print("\n[ERROR] Something went wrong when testing IDOR. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing IDOR.", url)
             pass
 
     def scan_idor(self, url):
@@ -1450,9 +1443,9 @@ class Scanner(Utilities):
                     print("\nPossible Insecure direct object references (IDOR) vulnerability in form.", "\nURL: ", url)
             return
         except Exception as e:
-            print("\n[ERROR] Something went wrong when scanning for IDOR. Error: ", e, file=self.err_file)
-            print("[Error Info] LINK:", url, file=self.err_file)
+            self.print_except_message('error', e, "Something went wrong when testing IDOR.", url)
             pass
+
 
 class CreateUserSession(Utilities):
     try:
@@ -1460,7 +1453,9 @@ class CreateUserSession(Utilities):
             self.user = Utilities.__init__(self, url, ignored_links_path, username, password)
             # self.check_scan_build_url(url, username, password, sec_level=sec_level)
     except Exception as e:
-        print("Something went wrong when attempting to create a new user session.")
+        print(Fore.RED + "\n[ERROR] Something went wrong when creating a new user session. Quitting..\n")
+        print(Fore.RESET)
+        print("Error: ", e)
 
 #     def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths
 #         try:
@@ -2306,6 +2301,7 @@ class CreateUserSession(Utilities):
 #             print("\n[ERROR] Something went wrong when testing Security Misconfiguration. Error: ", e, file=self.error_file)
 #             pass
 
+
 if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser(description='Scan Web Application for Vulnerabilities')
@@ -2357,5 +2353,7 @@ if __name__ == '__main__':
                                       comprehensive_scan=args.comprehensive_scan)
         Scanner.scan()
     except Exception as e:
-        print("FATAL ERROR OCCURRED: ", e)
+        print(Fore.RED + "\n[ERROR] FATAL ERROR OCCURRED. Quitting..\n")
+        print(Fore.RESET)
+        print("Error: ", e)
         quit()
