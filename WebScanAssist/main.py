@@ -12,6 +12,7 @@ import urllib.request
 from bs4 import BeautifulSoup
 import argparse
 import os
+from CustomImports import html_report
 # import queue
 # import socket
 # import ssl
@@ -288,7 +289,7 @@ class DataStorage:
             print("Error: ", e)
             pass
 
-    def inject_type(self, p_type):
+    def inject_type(self, p_type): # TODO: Pritify the injection types to match human readable formats.
         try:
             # Based on filename, get the injection type, used for SQL primary.
             for key, value in self.sql_dict.items():
@@ -403,15 +404,6 @@ class ScanConfigParameters:
             self.ignored_links = self.ignored_links.read()
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong when opening the Ignored Links file. Quitting..\n")
-            print(Fore.RESET)
-            print("Error: ", e)
-            quit()
-
-        try:  # Report file
-            # Try to read an exiting report file, create one is none is found.
-            self.report_file = open('report.json', 'a')
-        except Exception as e:
-            print(Fore.RED + "\n[ERROR] Something went wrong when opening the Report File. Quitting..\n")
             print(Fore.RESET)
             print("Error: ", e)
             quit()
@@ -865,6 +857,8 @@ class Scanner(Utilities):
                 self.scan_xss(url)
                 # self.t_i_xml(url) # TODO: Fix XML
                 self.scan_idor(url)
+
+                html_report.write_html_report()
             return
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when attempting to initialize scan function. Quitting..")
@@ -977,18 +971,20 @@ class Scanner(Utilities):
                 sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data_list[index])
                 if sql_vuln:
                     if 0 < sql_conf <= 3:
-                        print("\nVulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
-                        print("Multiple other SQL Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
-                    elif sql_conf > 3:
-                        print("\n[Comprehensive Scan] Vulnerability: ", sql_type, "\nConfidence", sql_conf, "\nURL: ", url, "\nFORM: ", form)
-
+                        html_report.add_vulnerability('SQL Injection', 'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}.'.format(url, sql_type), 'Medium')
+                    else:
+                        html_report.add_vulnerability('SQL Injection', 'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}'.format(url, sql_type), 'Critical')
             # Bulk up User-Agent SQL Injection detection in the same function
             if self.t_ua_sql(url):
-                print("\n[Comprehensive Scan] Vulnerability: SQL User Agent Injection", "\nURL: ", url)
+                html_report.add_vulnerability('SQL Injection - User Agent',
+                                              'SQL Injection vulnerability identified on URL: {} using custom User-Agent.'.format(
+                                                  url), 'Critical')
 
             # Scan inputs outside forms/with no actionable form
             if self.t_i_sql_nfi(url):
-                print("\nVulnerability: ", 'SQL Injection - Time based', "\nURL: ", url)
+                html_report.add_vulnerability('SQL Injection',
+                                              'Time based (Blind) SQL Injection vulnerability identified on URL: {}.'.format(
+                                                  url), 'Medium')
             return
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)
@@ -1042,13 +1038,18 @@ class Scanner(Utilities):
                 # Print if Vulnerabilities are found.
                 if html_vuln:
                     if 0 < confidence <= 3:
-                        print("\nVulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
-                        print("Multiple other HTML Injection Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
+                        html_report.add_vulnerability('HTML Injection',
+                                                      'HTML Injection Vulnerability identified on URL: {}.'.format(
+                                                          url), 'Low')
                     else:
-                        print("\n[Comprehensive Scan] Vulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
+                        html_report.add_vulnerability('HTML Injection',
+                                                      'HTML Injection Vulnerability identified on URL: {}.'.format(
+                                                          url), 'High')
             # Test on non-form inputs
             if self.t_i_html_nfi(url):
-                print("\nVulnerability: HTML Injection non-form input", "\nURL: ", url)
+                html_report.add_vulnerability('HTML Injection',
+                                              'HTML Injection Vulnerability identified on URL: {}.'.format(
+                                                  url), 'Medium')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing HTML Injection.", url)
             pass
@@ -1061,7 +1062,9 @@ class Scanner(Utilities):
             # If iFrame loads the new page it means it is vulnerable.
             if iframe_url:
                 if iframe_payload in self.session.get(iframe_url).text.lower():
-                    print("\nVulnerability: iFrame Injection", "\nURL: ", url, "\nIFrame: ", iframe)
+                    html_report.add_vulnerability('iFrame Injection',
+                                                  'iFrame Injection Vulnerability identified on URL: {}.'.format(
+                                                      url), 'Low')
             return
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
@@ -1116,11 +1119,15 @@ class Scanner(Utilities):
             form_list, form_data_list = self.extract_forms_and_form_data(url)
             for index, form in enumerate(form_list):
                 if self.t_i_code_exec(url, form, form_data_list[index]):
-                    print("\nVulnerability: Code Execution", "\nURL: ", url, "\nFORMs: ", form)
+                    html_report.add_vulnerability('Code Execution Injection',
+                                                  'Code Execution Injection Vulnerability identified on URL: {}.'.format(
+                                                      url), 'High')
 
             # Non-form input
             if self.t_i_code_exec_nfi(url):
-                print("\nVulnerability: Code Execution - non-form inputs", "\nURL: ", url)
+                html_report.add_vulnerability('Code Execution Injection',
+                                              'Code Execution Injection Vulnerability identified on URL: {}.'.format(
+                                                  url), 'High')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for Code Execution Injection.", url)
             pass
@@ -1149,7 +1156,9 @@ class Scanner(Utilities):
     def scan_php_exec(self, url):
         try:
             if self.t_i_php_exec(url):
-                print("\nVulnerability: PHP Code Execution in URL", "\nURL: ", url)
+                html_report.add_vulnerability('PHP Code Execution Injection',
+                                              'PHP Code Execution Injection Vulnerability identified on URL: {}.'.format(
+                                                  url), 'High')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for PHP Code Execution Injection.", url)
             pass
@@ -1190,10 +1199,14 @@ class Scanner(Utilities):
             form_list, form_data_list = self.extract_forms_and_form_data(url)
             for index, form in enumerate(form_list):
                 if self.t_i_ssi(url, form, form_data_list[index]):
-                    print("\nVulnerability: SSI Code Execution in URL", "\nURL: ", url, "\nFORMs: ", form)
+                    html_report.add_vulnerability('SSI Code Execution Injection',
+                                                  'SSI Code Execution Injection Vulnerability identified on URL: {}.'.format(
+                                                      url), 'High')
             # Scan non-form inputs
             if self.t_i_ssi_nfi(url):
-                print("\nVulnerability: SSI Code Execution in URL non-form inputs", "\nURL: ", url)
+                html_report.add_vulnerability('SSI Code Execution Injection',
+                                              'SSI Code Execution Injection Vulnerability identified on URL: {}.'.format(
+                                                  url), 'High')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for SSI (Server-Side Includes).", url)
             pass
@@ -1237,7 +1250,9 @@ class Scanner(Utilities):
     def scan_role_def_cookie(self, url):
         try:
             if self.t_ba_role_definition_cookie():
-                print("\nVulnerability: Administrator roles defined in Cookie! Session can be hijacked!", "\nURL: ", url)
+                html_report.add_vulnerability('Administrator roles defined in Cookie',
+                                              'Administrator roles defined in Cookie identified on URL: {}. Session can be hijacked!'.format(
+                                                  url), 'High')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for role definition on cookies.", url)
             pass
@@ -1255,7 +1270,9 @@ class Scanner(Utilities):
     def scan_role_def_dir(self, url):
         try:
             if self.t_ba_role_definition_directories(url):
-                print("\nVulnerability: Administrator roles defined in URLs!", "\nURL: ", url)
+                html_report.add_vulnerability('Administrator roles defined in URL',
+                                              'Administrator roles defined in URL identified on URL: {}. Session can be hijacked!'.format(
+                                                  url), 'High')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for role definition directories.", url)
             pass
@@ -1276,11 +1293,13 @@ class Scanner(Utilities):
             session_vuln, curr_session_cookies = self.t_ba_session(url)
             if session_vuln:
                 if self.t_ba_strong_session(url, curr_session_cookies):
-                    print("\nVulnerability: Session is not secure. Session successfully Hijacked. \nURL: ",
-                          url)
+                    html_report.add_vulnerability('Insecure Session (HTTPS)',
+                                                  'Insecure Session (HTTPS) identified on URL: {}. Session was successfully hijacked!'.format(
+                                                      url), 'Medium')
                 else:
-                    print("\nVulnerability: Session not secure...(HTTP only). Session Hijacking might be possible. \nURL: ",
-                          url)
+                    html_report.add_vulnerability('Insecure Session (HTTP)',
+                                                  'Insecure Session (HTTP) identified on URL: {}. Session was successfully hijacked!'.format(
+                                                      url), 'Medium')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when checking the session.", url)
             pass
@@ -1301,7 +1320,9 @@ class Scanner(Utilities):
     def scan_browser_cache(self, url):
         try:
             if self.t_ba_browser_cache_weakness(url):
-                print("\nVulnerability: Potential Browser Cache Weakness vulnerability identified. \nURL: ", url)
+                html_report.add_vulnerability('Cache Weakness',
+                                              'Potential Browser Cache Weakness vulnerability identified.'.format(
+                                                  url), 'Low')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing browser cache.", url)
             pass
@@ -1389,14 +1410,21 @@ class Scanner(Utilities):
                 xss_vuln, confidence = self.t_i_xss(url, form, form_data_list[index])
                 if xss_vuln:
                     if 0 < confidence <= 3:
-                        print("\nVulnerability: XSS Injection", "\nURL: ", url,"\nConfidence: ", confidence, "\nFORMs: ", form)
-                        print("Multiple other XSS Injection Vulnerabilities suspected, use --comprehensive_scan option for in-depth scan")
+                        html_report.add_vulnerability('XSS Injection',
+                                                      'XSS Injection vulnerability identified on form. URL: {}'.format(
+                                                          url), 'High')
                     else:
-                        print("\n[Comprehensive Scan] Vulnerability: HTML Injection", "\nConfidence: ", confidence, "\nURL: ", url, "\nFORMs: ", form)
+                        html_report.add_vulnerability('XSS Injection',
+                                                      'XSS Injection vulnerability identified on form. URL: {}'.format(
+                                                          url), 'Critical')
             if self.t_i_xss_nfi(url):
-                print("\nVulnerability: XSS Injection - non-form input", "\nURL: ", url)
+                html_report.add_vulnerability('XSS Injection',
+                                              'XSS Injection vulnerability identified on URL: {}'.format(
+                                                  url), 'High')
             if self.t_ua_xss(url):
-                print("\nVulnerability: XSS Injection - User Agent", "\nURL: ", url)
+                html_report.add_vulnerability('XSS Injection',
+                                              'XSS Injection vulnerability identified using custom User-Agent. URL: {}'.format(
+                                                  url), 'Critical')
             return 0
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong testing XSS in form.", url)
@@ -1412,7 +1440,7 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing IDOR.", url)
             pass
 
-    def t_idor_nfi(self, url): # TODO: Modify IDOR to be generical
+    def t_idor_nfi(self, url): # TODO: Modify IDOR to be generic
         try:
             attempts = 0
             sub_string = re.findall('[?](.*)[=]*\d', url)
@@ -1436,11 +1464,15 @@ class Scanner(Utilities):
     def scan_idor(self, url):
         try:
             if self.t_idor_nfi(url):
-                print("\nVulnerability: Insecure direct object references (IDOR) - URL", "\nURL: ", url,"\nConfidence: ")
+                html_report.add_vulnerability('IDOR',
+                                              'Insecure direct object reference (IDOR) vulnerability identified. URL: {}'.format(
+                                                  url), 'Medium')
             form_list, form_data_list = self.extract_forms_and_form_data(url)
             for index, form in enumerate(form_list):
                 if self.t_idor(url, form_data_list[index]):
-                    print("\nPossible Insecure direct object references (IDOR) vulnerability in form.", "\nURL: ", url)
+                    html_report.add_vulnerability('IDOR',
+                                                  'Insecure direct object reference (IDOR) vulnerability identified on form. URL: {}'.format(
+                                                      url), 'Medium')
             return
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing IDOR.", url)
@@ -2300,8 +2332,6 @@ class CreateUserSession(Utilities):
 #         except Exception as e:
 #             print("\n[ERROR] Something went wrong when testing Security Misconfiguration. Error: ", e, file=self.error_file)
 #             pass
-
-
 if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser(description='Scan Web Application for Vulnerabilities')
