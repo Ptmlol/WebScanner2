@@ -53,7 +53,7 @@
         <h1>Vulnerability Report</h1>
         {% for vulnerability in vulnerabilities %}
         <div class="vulnerability">
-            <div class="severity">Severity: {{ vulnerability.severity }}</div>
+            <div class="severity">Confidence: {{ vulnerability.severity }}</div>
             <div class="type">{{ vulnerability.type }}</div>
             <div class="details">
                 <strong>Details:</strong>

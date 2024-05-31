@@ -9,7 +9,9 @@ from colorama import Fore
 import requests
 import urllib.parse
 import urllib.request
+import warnings
 from bs4 import BeautifulSoup
+from bs4 import MarkupResemblesLocatorWarning
 import argparse
 import os
 from CustomImports import html_report
@@ -30,6 +32,7 @@ import http.cookies
 # import shutil
 # import webbrowser
 
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 firstCallSpider = 1
 
 
@@ -706,6 +709,9 @@ class Utilities(ScanConfigParameters):
                         quit()
                     elif self.process_login(username, password, sec_level):
                         self.DataStorage.urls.append(url)
+                else:
+                    # If login is not required, perform crawling.
+                    self.spider(url)
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when checking for login requirements or scan options. Quitting..")
             quit()
@@ -808,20 +814,20 @@ class Utilities(ScanConfigParameters):
             if m_type == 'error':
                 if error:
                     if custom_message:
-                        print(Fore.RED + "\n[ERROR] " + custom_message + "\nPlease check the Error file for additional details.")
+                        print(Fore.RED + "\n[ERROR] " + str(custom_message) + "\nPlease check the Error file for additional details.")
                         if url:
-                            print(Fore.RED + "\n[ERROR] URL:" + url + "\nDetails: " + custom_message + "\nError Details: " + error, file=self.err_file)
+                            print(Fore.RED + "\n[ERROR] URL:" + str(url) + "\nDetails: " + str(custom_message) + "\nError Details: " + str(error), file=self.err_file)
                         else:
-                            print(Fore.RED + "\n[ERROR] " + "\nDetails: " + custom_message + "\nError Details: " + error, file=self.err_file)
+                            print(Fore.RED + "\n[ERROR] " + "\nDetails: " + str(custom_message) + "\nError Details: " + str(error), file=self.err_file)
                     else:
                         print(Fore.RED + "\n[ERROR] Please check the Error file for additional details.")
                         if url:
-                            print(Fore.RED + "\n[ERROR] URL:" + url + "\nError Details: " + error, file=self.err_file)
+                            print(Fore.RED + "\n[ERROR] URL:" + str(url) + "\nError Details: " + error, file=self.err_file)
                         else:
-                            print(Fore.RED + "\n[ERROR] " + error, file=self.err_file)
+                            print(Fore.RED + "\n[ERROR] " + str(error), file=self.err_file)
             print(Fore.RESET)
-        except Exception:
-            print(Fore.RED + "[ERROR] Something went wrong when printing to Error File.")
+        except Exception as e:
+            print(Fore.RED + "[ERROR] Something went wrong when printing to Error File.", e)
             print(Fore.RESET)
             pass
 
@@ -831,6 +837,7 @@ class Scanner(Utilities):
     def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None, comprehensive_scan=None):
         self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
         self.comprehensive_scan = comprehensive_scan
+        self.static_scan = static_scan
         self.check_scan_build_url(url, username, password, static_scan)
         self.username = username
         self.password = password
@@ -857,6 +864,9 @@ class Scanner(Utilities):
                 self.scan_xss(url)
                 # self.t_i_xml(url) # TODO: Fix XML
                 self.scan_idor(url)
+                self.scan_cors(url)
+                self.scan_xst(url)
+                self.scan_robotstxt(url)
 
                 html_report.write_html_report()
             return
@@ -1478,6 +1488,65 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing IDOR.", url)
             pass
 
+# Security Misconfigurations
+
+    def t_cors(self, url):
+        try:
+            if self.session.get(url).headers['Access-Control-Allow-Origin'] == '*':
+                return True
+            return False
+        except Exception:
+            pass
+
+    def scan_cors(self, url):
+        try:
+            if self.t_cors(url):
+                html_report.add_vulnerability('Cross-Origin Resource Sharing',
+                                              'Cross-Origin Resource Sharing (CORS) vulnerability identified on URL: {}'.format(
+                                                  url), 'Low')
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for CORS.", url)
+            pass
+
+    def t_xst(self, url):
+        try:
+            trace_request = requests.Request('TRACE', url)
+            prepared_trace = trace_request.prepare()
+            if self.session.send(prepared_trace).status_code == 200:
+                return True
+            return False
+        except Exception:
+            pass
+
+    def scan_xst(self, url):
+        try:
+            if self.t_xst(url):
+                html_report.add_vulnerability('Cross-Site Tracing (XST)',
+                                              'Cross-Site Tracing (XST) vulnerability identified on URL: {}'.format(
+                                                  url), 'Low')
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for XST.", url)
+            pass
+
+# TODO: Further misconfigs can be found with after nmap and after URL scraping is configured
+
+    def scan_robotstxt(self, url):  # https://github.com/danielmiessler/RobotsDisallowed/blob/master/top1000.txt
+        try: # TODO: Create detection of sensitive data in this robots by the above URL
+            if 'robots' not in url and self.static_scan is None:
+                url_robots = urllib.parse.urljoin(url, '/robots.txt')
+            else:
+                url_robots = url
+            req_robots = self.session.get(url_robots)
+            robots_urls = re.findall('Disallow: (.*)', req_robots.text)
+            if robots_urls:
+                html_report.add_vulnerability('Robots.txt',
+                                              'Robots.txt contains the following values: \n{}'.format([i.replace("'", "") for i in robots_urls]), 'Informational')
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing Robots.txt.", url)
+            pass
+
 
 class CreateUserSession(Utilities):
     try:
@@ -1490,50 +1559,7 @@ class CreateUserSession(Utilities):
         print("Error: ", e)
 
 #     def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths
-#         try:
-#             with open(config_object["FILE"]["hidden_url_dict"], "r") as file:
-#                 paths = file.read().split("\n")
-#                 file.close()
-#             for hidden_path in paths:
-#                 if self.target_url + hidden_path not in self.visited and\
-#                         self.target_url + hidden_path not in self.ignored_links and\
-#                         self.target_url + hidden_path not in self.target_links and\
-#                         "logout" not in self.target_url + hidden_path and\
-#                         len(self.visited) <= int(config_object['TEST']['max_number_of_hidden_links']):
-#                     response = self.session.get(self.target_url + hidden_path)
-#                     if response.status_code == 200:
-#                         link_visited = self.target_url + hidden_path
-#                         self.visited.append(str(link_visited))
-#             if self.visited:
-#                 return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when searching for paths. Error: ", e, file=self.error_file)
-#             pass
-#
-#
 
-    # def test_nosql(self, form, url):  # Add more payloads
-    #     try:
-    #         global nosql_injection_dict_normal, nosql_injection_dict_injected
-    #         no_nosql_payload = ""
-    #         response_wh_payload = self.submit_form(form, no_nosql_payload, url)
-    #         normal_response_time = response_wh_payload.elapsed.total_seconds()
-    #         nosql_detect_payload = "';sleep(5000); ';it=new%20Date();do{pt=new%20Date();}while(pt-it<5000);"  # https://www.objectrocket.com/blog/mongodb/code-injection-in-mongodb/
-    #         response_w_payload = self.submit_form(form, nosql_detect_payload, url)
-    #         nosql_response_time = response_w_payload.elapsed.total_seconds()
-    #
-    #         if nosql_response_time > normal_response_time and nosql_response_time > 1:
-    #             nosql_injection_dict_normal[url] = normal_response_time
-    #             nosql_injection_dict_injected[url] = nosql_response_time
-    #             return True
-    #         return False
-    #     except Exception as e:
-    #         print("\n[ERROR] Something went wrong when testing for NOSQL Injection. Error: ", e, file=self.error_file)
-    #         print("[Error Info] FORM:", form, file=self.error_file)
-    #         print("[Error Info] LINK:", url, file=self.error_file)
-    #         pass
-    #
     # def javascript_exec(self, url):  # Add more payloads
     #     try:
     #         try:
@@ -1594,13 +1620,6 @@ class CreateUserSession(Utilities):
     #         print("[Error Info] LINK:", url, file=self.error_file)
     #         pass
 
-
-
-
-    #
-
-    #
-    #
     # def check_hidden_path(self, h_path):
     #     try:
     #         try:
@@ -1939,79 +1958,10 @@ class CreateUserSession(Utilities):
 #     # Test File Extensions Handling for Sensitive Information
 #     # Present Extensions (analyze robots.txt)
 #
-#     def search_extensions_robots(self):  # https://github.com/danielmiessler/RobotsDisallowed/blob/master/top1000.txt
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Checking robots.txt")
-#             except Exception:
-#                 pass
-#             f = open(config_object['FILE']['robots_dict'], "r")
-#             print("\nAnalyzing robots.txt for interesting urls..!", file=self.report_file)
-#             potential_display = []
-#             unwanted_display_of_url = []
-#             dir_list = [line.strip() for line in f.readlines()]
-#             f.close()
-#             robots_url = str(config_object["WEBURL"]["target"]) + "/robots.txt"
-#             req_robots = self.session.get(robots_url)
-#             robots_urls = re.findall('Disallow: (.*)', req_robots.text)
-#             if not len(robots_urls) <= 3:
-#                 print("Directories ignored by search engines:", file=self.report_file)
-#                 print(*robots_urls, sep="\n", file=self.report_file)
-#             else:
-#                 print("No directories found inside robots.txt", file=self.report_file)
-#                 return
-#             print("Testing for something interesting...", file=self.report_file)
-#             for item in dir_list:
-#                 if item in robots_urls:
-#                     potential_display.append(item)
-#                 check_disallow_url = str(config_object["WEBURL"]["target"]) + str(item)
-#                 if self.check_response(check_disallow_url):
-#                     unwanted_display_of_url.append(check_disallow_url)
-#             if potential_display:
-#                 print("[!!!-!!!]Potential display of sensitive information found in robots.txt: ", file=self.report_file)
-#                 print(*potential_display, sep="\n")
-#             if unwanted_display_of_url:
-#                 print("[!!!-???]Got OK response from the following URLs. Sensitive information might be revealed. Manual check needed: ", file=self.report_file)
-#                 print(*unwanted_display_of_url, sep="\n", file=self.report_file)
-#             if not potential_display or not unwanted_display_of_url:
-#                 print("[END]Nothing interesting found on robots.txt. It may be empty.", file=self.report_file)
-#             print("[END] End of analyzing robots.txt", file=self.report_file)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when analyzing robots.txt. Error: ", e, file=self.error_file)
-#             pass
-#
-#     # Form present extensions
-#
-#     def check_forms_files(self, form):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Checking forms for file extensions")
-#             except Exception:
-#                 pass
-#             action = form.get("action")
-#             if not action:
-#                 return False
-#             elif "." in action and '/' not in action and '\\' not in action:
-#                 inputs_list = form.findAll("input", type='hidden')
-#                 for inputs in inputs_list:
-#                     input_type = inputs.get("type")
-#                     if str(input_type).lower() == "hidden":
-#                         return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking form 'action' attribute. Error: ", e, file=self.error_file)
-#             print("[Error Info] FORM:", form, file=self.error_file)
-#             pass
-#
 #     # HTTP Methods
 #
 #     def test_http(self):
 #         try:
-#             try:
-#                 my_gui.update_list_gui("Testing HTTP Methods")
-#             except Exception:
-#                 pass
 #             test_data = {"test": 'test'}
 #             response = self.session.put(str(config_object['WEBURL']['target']) + '/test.html', data=test_data)
 #             if str(response.status_code).startswith("3") or str(response.status_code).startswith("2"):
@@ -2059,66 +2009,6 @@ class CreateUserSession(Utilities):
 #             print("\n[ERROR] Something went wrong when testing RIA. Error: ", e, file=self.error_file)
 #             print("[Error Info] LINK LIST:", link_list, file=self.error_file)
 #             pass
-#
-#     # File Upload Vulnerability Extension
-#
-#     def create_file_dir(self, subdir):
-#         try:
-#             global temp_dir
-#             filenames = ["filefortest.php", "fIleForTest.Php.JpEG", "fiL3ForTest.hTMl.JPG", "shell.phPWND", "fIleForTest.eXe.jsp"]
-#             here = os.path.dirname(os.path.realpath(__file__))
-#             temp_dir = os.path.join(here, subdir)
-#             if not os.path.exists(temp_dir):
-#                 os.mkdir(temp_dir)
-#             for filename in filenames:
-#                 if not os.path.isfile("./" + filename):
-#                     filepath = os.path.join(here, subdir, filename)
-#                     test_file = open(filepath, 'w+')
-#                     test_file.write("This is unharmful content to be uploaded to the site")
-#                     test_file.close()
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when creating temporary files. Error: ", e, file=self.error_file)
-#             print("[Error Info] SUBDIR Name:", subdir, file=self.error_file)
-#             pass
-#
-#     def file_upload(self, form, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing File Upload Injection")
-#             except Exception:
-#                 pass
-#             is_file = False
-#             inputs_list = form.find_all("inputs")
-#             response = self.get_content(url)
-#             if 'multipart/form-data' in str(response.content).lower():
-#                 is_file = True
-#             for inputs in inputs_list:
-#                 if inputs.get("type").lower() == "file":
-#                     is_file = True
-#             if is_file is True:
-#                 self.create_file_dir("temp")
-#                 cur_path = os.path.join(os.path.dirname(__file__), 'temp')
-#                 dir_listing = os.listdir(cur_path)
-#                 os.chdir(cur_path)
-#                 for i in dir_listing:
-#                     path_for_file = os.path.relpath('..\\temp\\' + i, cur_path)
-#                     f = open(path_for_file, 'rb')
-#                     files = {'uploaded': f}
-#                     if self.submit_form(form, "value", url, files).status_code == 200:
-#                         f.close()
-#                         if os.getcwd() != stable_directory:
-#                             os.chdir(stable_directory)
-#                         return True
-#             if os.getcwd() != stable_directory:
-#                 os.chdir('..')
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing file upload. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             print("[Error Info] FORM:", form, file=self.error_file)
-#             pass
-#
 #
 #     # Test LFI
 #
@@ -2205,39 +2095,6 @@ class CreateUserSession(Utilities):
 #             pass
 #
 #     # Test Suit Classifier
-#
-#     def test_injections(self, url, form=None, test=False):
-#         try:
-#             if test:
-#                 if form and url:
-#                     if self.t_i_xss_in_form(form, url):
-#                         links_forms_dict_xss[url] = form
-#                     if self.test_sql(form, url):
-#                         links_forms_dict_sql_injection[url] = form
-#                     if self.code_exec(form, url):
-#                         links_forms_dict_code_exec[url] = form
-#                     if self.ssi_injection(form, url):
-#                         links_forms_dict_ssi_injection[url] = form
-#                     if self.test_nosql(form, url):
-#                         links_forms_dict_nosql_injection[url] = form
-#                 elif "=" in url:
-#                     if self.t_i_xss_in_link(url):
-#                         links_xss_link.append(url)
-#                     if self.t_i_html(url):
-#                         links_html_injection.append(url)
-#                     if self.ssrf_injection(url):
-#                         links_ssrf_injection.append(url)
-#                 elif url:
-#                     if self.javascript_exec(url):
-#                         links_javascript_code.append(url)
-#                     if self.host_header_injection(url):
-#                         links_host_header_injection.append(url)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Injections. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
 #     def test_broken_auth(self, url=None, test=False):
 #         try:
 #             if test:
@@ -2309,29 +2166,7 @@ class CreateUserSession(Utilities):
 #             print("\n[ERROR] Something went wrong when testing Broken Access Control. Error: ", e, file=self.error_file)
 #             pass
 #
-#     def test_security_misconfiguration(self, url=None, form=None, test=False):
-#         try:
-#             if test:
-#                 if not url:
-#                     self.search_extensions_robots()
-#                     if self.test_http():
-#                         print("\n[!!!---!!!] HTTP PUT Method got OK status. Application might be vulnerable!", file=self.report_file)
-#                     if self.test_hsts():
-#                         print(
-#                             "\n[!!!---!!!] HTTP Strict Transport Security NOT found. Application is vulnerable to sniffing and certificate invalidation vulnerability!", file=self.report_file)
-#                     if self.test_ria(final_list):
-#                         print(
-#                             "\n[!!!---???] Overly permissive policy file found. Tester must review Crossdomain.xml / Clientaccesspolicy.xml", file=self.report_file)
-#                 else:
-#                     if form:
-#                         if self.check_forms_files(form):
-#                             links_forms_files_in_form[url] = form
-#                         if self.file_upload(form, url):
-#                             links_forms_dict_file_upload[url] = form
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Security Misconfiguration. Error: ", e, file=self.error_file)
-#             pass
+
 if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser(description='Scan Web Application for Vulnerabilities')
