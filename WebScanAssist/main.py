@@ -15,11 +15,12 @@ from bs4 import MarkupResemblesLocatorWarning
 import argparse
 import os
 from CustomImports import html_report
+from Config import config
 # import queue
 # import socket
 # import ssl
 # from datetime import datetime
-# from configparser import ConfigParser
+
 # from tkinter import *
 # from tkinter.ttk import *
 # from tkinter.font import *
@@ -35,62 +36,6 @@ import http.cookies
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 firstCallSpider = 1
 
-
-# try:
-#     config_object = ConfigParser()
-#     config_object.read("config/config.ini")
-# except Exception as e:
-#     print(e)
-#
-# port_set = set()
-# server_set = set()
-# comment_set = set()
-# script_set = set()
-#
-# linux_servers = ["apache", "nginx", "caddy", "openlitespeed", "hiawatha"]
-# windows_servers = ["IIS"]
-# mixed_servers = ["nodejs", "lighttpd"]
-# privilege_data = ["groupID=grp001&orderID=0001", "grpID=2&item=1", "grp=group1", "role=5"]
-#
-# sql_injection_dict_normal = {}
-# sql_injection_dict_injected = {}
-# nosql_injection_dict_normal = {}
-# nosql_injection_dict_injected = {}
-#
-# links_potential_role_definition = []
-# links_vulnerable_to_lfi = []
-# links_without_secure_cookie_with_sessid = []
-# links_browser_cache_weakness = []
-# links_lfi_directory_transversal = []
-# links_cookie_directory_transversal = []
-# links_bypass_authorization = []
-# links_special_header = []
-# links_xee_vuln = []
-# links_xss_link = []
-# links_privilege_escal = []
-# links_idor = []
-# links_javascript_code = []
-# links_html_injection = []
-# links_host_header_injection = []
-# links_ssrf_injection = []
-#
-# links_forms_dict_xss = {}
-# links_forms_dict_file_upload = {}
-# links_forms_dict_code_exec = {}
-# links_forms_dict_sql_injection = {}
-# links_forms_dict_nosql_injection = {}
-# links_forms__dict_sensitive_info = {}
-# links_forms_files_in_form = {}
-# links_forms_dict_ssi_injection = {}
-# final_list = []
-#
-# session_id = ""
-# prev_session_id = ""
-#
-# dtd_url = []
-# temp_dir = None
-#
-# stable_directory = os.getcwd()
 #
 # class LoginTests:
 #     def __init__(self, user, login_url, pass_file, wrong_username, good_password, certain_wrong_passwd, logout_url, file_for_report, error_file):
@@ -350,7 +295,7 @@ class DataStorage:
 
 
 class ScanConfigParameters:
-    def __init__(self, url, ignored_links_path):
+    def __init__(self, url):
         try:
             # Initialize Scanner Configuration Parameters.
             self.url = url
@@ -358,15 +303,17 @@ class ScanConfigParameters:
             self.session = requests.Session()
             # Initialize Data Storage.
             self.DataStorage = DataStorage()
+            # Initialize Config File
+            self.config_params = config.Config().config_object
             # Setup initial requirements and prepare files.
-            self.setup(ignored_links_path)
+            self.setup()
         except Exception:
             print(Fore.RED + "\n[ERROR] Something went wrong during initialization. Quitting..\n")
             print(Fore.RESET)
             print("Error: ", e)
             quit()
 
-    def setup(self, ignored_links_path):
+    def setup(self):
         try:  # Test connection
             test_get = self.session.get(self.url)
             if test_get.status_code == 404: # If page is not found, scanner will not start.
@@ -397,14 +344,8 @@ class ScanConfigParameters:
             print("Error: ", e)
             quit()
 
-        try:  # Link Ignore file # TODO: or change to a config
-            #  Try to read an existing link Ignore file, create one if none is found.
-            self.ignored_links = open(ignored_links_path + '/linkignore.log', 'r')
-            # Check if file is empty before writing.
-            if os.stat(ignored_links_path + '/linkignore.log').st_size == 0:
-                self.ignored_links.write("www.example_url.com")
-            # Add the ignored links to a class variable
-            self.ignored_links = self.ignored_links.read()
+        try:  # Import Ignored URLs from Config file.
+            self.ignored_links = self.config_params['URLS']['ignored'].split(",")
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong when opening the Ignored Links file. Quitting..\n")
             print(Fore.RESET)
@@ -413,8 +354,8 @@ class ScanConfigParameters:
 
 
 class Utilities(ScanConfigParameters):
-    def __init__(self, url, ignored_links_path, username=None, password=None):  # Inherits Config Class
-        ScanConfigParameters.__init__(self, url, ignored_links_path)
+    def __init__(self, url, username=None, password=None):  # Inherits Config Class
+        ScanConfigParameters.__init__(self, url)
 
     def process_login(self, username, password, sec_level=None):
         try:
@@ -497,9 +438,11 @@ class Utilities(ScanConfigParameters):
                                 1) == re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)",
                                                 self.url).group(1):
                             # Add URLs to main list object, ignore the user - ignored ones.
-                            if extracted_url not in self.DataStorage.urls and extracted_url not in self.ignored_links:
-                                self.DataStorage.urls.append(extracted_url)
-                                self.spider(extracted_url)
+                            if extracted_url not in self.DataStorage.urls:
+                                for ignored_link in self.ignored_links:
+                                    if str(ignored_link) not in str(extracted_url):
+                                        self.DataStorage.urls.append(extracted_url)
+                                        self.spider(extracted_url)
                         else:  # TODO: Build site map by adding the related domains (other than the app domain) to a list (one hop only)
                             self.DataStorage.related_domains.append(extracted_url)
             # IF it's not 200 and not 4XX, means that there are some ways of accessing the URL.
@@ -834,22 +777,18 @@ class Utilities(ScanConfigParameters):
 
 # Scanner class handles scan jobs
 class Scanner(Utilities):
-    def __init__(self, url, ignored_links_path, username=None, password=None, static_scan=None, comprehensive_scan=None):
-        self.Utils = Utilities.__init__(self, url, ignored_links_path, username, password)
+    def __init__(self, url, username=None, password=None, static_scan=None, comprehensive_scan=None):
+        self.Utils = Utilities.__init__(self, url, username, password)
         self.comprehensive_scan = comprehensive_scan
         self.static_scan = static_scan
         self.check_scan_build_url(url, username, password, static_scan)
         self.username = username
         self.password = password
-        self.ignored_links_path = ignored_links_path
 
     def scan(self):
         try:
             # Scan harvested URLs
             for url in self.DataStorage.urls:
-                # Call all functions for tests for each URL. ignore links ignored in file
-                if url in self.ignored_links:
-                    continue
                 # Form and URL scan
                 self.scan_html(url)
                 self.scan_iframe(url)
@@ -859,7 +798,7 @@ class Scanner(Utilities):
                 self.scan_sql(url)
                 self.scan_role_def_dir(url)
                 self.scan_role_def_cookie(url)
-                #self.scan_browser_cache(url) # Ok, just whole app is vuln
+                #self.scan_browser_cache(url) # Ok, just whole app is vuln, temp comment
                 # self.scan_session(url) # TODO : Fix Strong Sessions
                 self.scan_xss(url)
                 # self.t_i_xml(url) # TODO: Fix XML
@@ -1339,7 +1278,7 @@ class Scanner(Utilities):
 
     def t_ba_strong_session(self, url, cookies):
         try:
-            new_user = CreateUserSession(url, self.ignored_links_path, self.username, self.password, "2")
+            new_user = CreateUserSession(url, self.username, self.password, "2")
             new_user_cookies = new_user.extract_cookies()
             for key, value in cookies.items():
                 if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(key).lower():
@@ -1542,16 +1481,16 @@ class Scanner(Utilities):
             robots_urls = re.findall('Disallow: (.*)', req_robots.text)
             if robots_urls:
                 html_report.add_vulnerability('Robots.txt',
-                                              'Robots.txt contains the following values: \n{}'.format([i.replace("'", "") for i in robots_urls]), 'Informational')
+                                              'Robots.txt contains the following values: \n{}'.format([i.replace("'", "") for i in robots_urls]), 'Informational') #TODO: Pretify the print of robots contents to report
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing Robots.txt.", url)
             pass
 
 
-class CreateUserSession(Utilities):
+class CreateUserSession(Utilities): # TODO: Create another py module for the new user.
     try:
-        def __init__(self, url, ignored_links_path, username, password, sec_level=None):
-            self.user = Utilities.__init__(self, url, ignored_links_path, username, password)
+        def __init__(self, url, username, password, sec_level=None):
+            self.user = Utilities.__init__(self, url, username, password)
             # self.check_scan_build_url(url, username, password, sec_level=sec_level)
     except Exception as e:
         print(Fore.RED + "\n[ERROR] Something went wrong when creating a new user session. Quitting..\n")
@@ -2172,8 +2111,6 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser(description='Scan Web Application for Vulnerabilities')
         # Provide argument for URL. URL does not require flag but requires 'URL'.
         parser.add_argument("url", type=str, help="Provide an URL to scan")
-        # Provide custom path to ignored links file, default is working directory.
-        parser.add_argument("-i", "--ignored_links_path", help="Absolute Path to ignored links file", default=os.getcwd())
         # Get Credentials for login if needed. Flags not mandatory/
         parser.add_argument("-u", "--username", help="Username to login with")
         parser.add_argument("-p", "--password", help="Password to login with")
@@ -2188,34 +2125,27 @@ if __name__ == '__main__':
             if args.static_scan:
                 # Sent the relevant arguments in relation to the required scan type.
                 if re.match('^http|https?://', args.url):
-                    Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password,
-                                      static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner(args.url, args.username, args.password, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
                 else:
-                    Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password,
-                                      static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner('http://' + args.url, args.username, args.password, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
             # If static scan not required, continue without flag and perform scan type.
             else:
                 if re.match('^http|https?://', args.url):
-                    Scanner = Scanner(args.url, args.ignored_links_path, args.username, args.password,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner(args.url, args.username, args.password, comprehensive_scan=args.comprehensive_scan)
                 else:
-                    Scanner = Scanner('http://' + args.url, args.ignored_links_path, args.username, args.password,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner('http://' + args.url, args.username, args.password, comprehensive_scan=args.comprehensive_scan)
         # If no username AND password is provided, determine scan type and try to scan. If username and password are required but not provided, app will throw an error.
         elif not (args.username and args.password):
             if args.static_scan:
                 if re.match('^http|https?://', args.url):
-                    Scanner = Scanner(args.url, args.ignored_links_path, static_scan=args.static_scan,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner(args.url, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
                 else:
-                    Scanner = Scanner('http://' + args.url, args.ignored_links_path, static_scan=args.static_scan,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner('http://' + args.url, static_scan=args.static_scan, comprehensive_scan=args.comprehensive_scan)
             else:
                 if re.match('^http|https?://', args.url):
-                    Scanner = Scanner(args.url, args.ignored_links_path, comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner(args.url, comprehensive_scan=args.comprehensive_scan)
                 else:
-                    Scanner = Scanner('http://' + args.url, args.ignored_links_path,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner('http://' + args.url, comprehensive_scan=args.comprehensive_scan)
         Scanner.scan()
     except Exception as e:
         print(Fore.RED + "\n[ERROR] FATAL ERROR OCCURRED. Quitting..\n")
