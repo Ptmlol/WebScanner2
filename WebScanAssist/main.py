@@ -806,6 +806,7 @@ class Scanner(Utilities):
                 self.scan_cors(url)
                 self.scan_xst(url)
                 self.scan_robotstxt(url)
+                self.scan_hhi(url)
 
                 html_report.write_html_report()
             return
@@ -1486,6 +1487,34 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing Robots.txt.", url)
             pass
 
+# Sensitive Data Exposure
+    def t_i_host_header(self, url):
+        try:
+            host = {'Host': 'google.com'}
+            host_injection = self.session.get(url, headers=host)
+            x_host = {'X-Forwarded-Host': 'google.com'}
+            x_host_injection = self.session.get(url, headers=x_host)
+            print(x_host_injection.url)
+            if host_injection.status_code == 200 and str(host_injection.url) == str(url):
+                return True
+            elif x_host_injection.status_code == 200 and str(x_host_injection.url) == str(url):
+                return True
+            return False
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing Host Header Injection.", url)
+            pass
+
+    def scan_hhi(self, url):
+        try:
+            if self.t_i_host_header(url):
+                html_report.add_vulnerability('Host-Header Injection',
+                                              'Host-Header Injection vulnerability identified on URL: {}'.format(
+                                                  url), 'Low')
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Host Header Injection.", url)
+            pass
+
 
 class CreateUserSession(Utilities): # TODO: Create another py module for the new user.
     try:
@@ -1519,23 +1548,6 @@ class CreateUserSession(Utilities): # TODO: Create another py module for the new
     #         pass
     #
     #
-    # def host_header_injection(self, url):
-    #     try:
-    #         try:
-    #             my_gui.update_list_gui("Testing for HH Injection")
-    #         except Exception:
-    #             pass
-    #         host = {'Host': 'www.google.com'}
-    #         x_host = {'X-Forwarded-Host': 'www.google.com'}
-    #         if self.session.get(url, headers=host).status_code == 200:
-    #             return True
-    #         elif self.session.get(url, headers=x_host).status_code == 200:
-    #             return True
-    #         return False
-    #     except Exception as e:
-    #         print("\n[ERROR] Something went wrong when testing Host Header Injection. Error: ", e, file=self.error_file)
-    #         print("[Error Info] LINK:", url, file=self.error_file)
-    #         pass
     #
     # def ssrf_injection(self, url):  # Add more payloads
     #     try:
