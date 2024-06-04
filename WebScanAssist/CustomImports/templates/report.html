@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <meta id="my-data" data-name="{{tree_json}}">
     <title>Vulnerability Report</title>
     <style>
         body {
@@ -11,6 +13,7 @@
             padding: 0;
             background-color: #f4f4f4;
         }
+
         .container {
             width: 80%;
             margin: 0 auto;
@@ -18,29 +21,36 @@
             background-color: #fff;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             text-align: center;
             color: #333;
         }
+
         .vulnerability {
             border-bottom: 1px solid #ddd;
             padding: 10px 0;
         }
+
         .vulnerability:last-child {
             border-bottom: none;
         }
+
         .severity {
             font-weight: bold;
             color: #e74c3c;
         }
+
         .type {
             margin: 10px 0;
         }
+
         .details {
             background-color: #f9f9f9;
             padding: 10px;
             border-radius: 5px;
         }
+
         .footer {
             text-align: center;
             padding: 20px 0;
@@ -49,21 +59,66 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Vulnerability Report</h1>
-        {% for vulnerability in vulnerabilities %}
-        <div class="vulnerability">
-            <div class="severity">Confidence: {{ vulnerability.severity }}</div>
-            <div class="type">{{ vulnerability.type }}</div>
-            <div class="details">
-                <strong>Details:</strong>
-                <pre>{{ vulnerability.details }}</pre>
-            </div>
+<div class="container">
+    <h1>Vulnerability Report</h1>
+    {% for vulnerability in vulnerabilities %}
+    <div class="vulnerability">
+        <div class="severity">Confidence: {{ vulnerability.severity }}</div>
+        <div class="type">{{ vulnerability.type }}</div>
+        <div class="details">
+            <strong>Details:</strong>
+            <pre>{{ vulnerability.details }}</pre>
         </div>
-        {% endfor %}
     </div>
-    <div class="footer">
-        &copy; 2024 Python Web Vulnerability Scanner
-    </div>
+    {% endfor %}
+</div>
+<div class="footer">
+    &copy; 2024 Python Web Vulnerability Scanner
+</div>
+
+<script>
+    function printTree(
+        initialTree,
+        printNode,
+        getChildren,
+    ) {
+        function printBranch(tree, branch) {
+            const isGraphHead = branch.length === 0;
+            const children = getChildren(tree) || [];
+
+            let branchHead = '';
+
+            if (!isGraphHead) {
+                branchHead = children && children.length !== 0 ? '┬ ' : '─ ';
+            }
+
+            const toPrint = printNode(tree, `${branch}${branchHead}`);
+
+            if (typeof toPrint === 'string') {
+                console.log(`${branch}${branchHead}${toPrint}`);
+            }
+
+            let baseBranch = branch;
+
+            if (!isGraphHead) {
+                const isChildOfLastBranch = branch.slice(-2) === '└─';
+                baseBranch = branch.slice(0, -2) + (isChildOfLastBranch ? '  ' : '│ ');
+            }
+
+            const nextBranch = baseBranch + '├─';
+            const lastBranch = baseBranch + '└─';
+
+            children.forEach((child, index) => {
+                printBranch(child, children.length - 1 === index ? lastBranch : nextBranch);
+            });
+        }
+
+        printBranch(initialTree, '');
+    }
+
+    const tree = JSON.parse('{{tree_json}}');
+    printTree(tree, node => node.name.toUpperCase(), node => node.children,)
+    console.log(tree)
+</script>
 </body>
 </html>
