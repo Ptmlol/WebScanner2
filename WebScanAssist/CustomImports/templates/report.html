@@ -61,6 +61,9 @@
 <body>
 <div class="container">
     <h1>Vulnerability Report</h1>
+    {% if vulnerabilities %}
+    <h4>Vulnerability Scan Result:</h4>
+    {% endif %}
     {% for vulnerability in vulnerabilities %}
     <div class="vulnerability">
         <div class="severity">Confidence: {{ vulnerability.severity }}</div>
@@ -72,8 +75,25 @@
     </div>
     {% endfor %}
 </div>
+
+<div class="container">
+    {% if tree_json %}
+    <h4>Application URL Map:</h4>
+    {% endif %}
+    <pre class="details" id="output"></pre>
+</div>
+
+<div class="container">
+    {% if external_links %}
+    <h4>External URLs:</h4>
+    {% endif %}
+    {% for link in external_links %}
+    <div class="details">{{ link }}</div>
+    {% endfor %}
+</div>
+
 <div class="footer">
-    &copy; 2024 Python Web Vulnerability Scanner
+    &copy; 2024 Python Web Vulnerability Scanner - Naiboiu Teodor
 </div>
 
 <script>
@@ -95,7 +115,11 @@
             const toPrint = printNode(tree, `${branch}${branchHead}`);
 
             if (typeof toPrint === 'string') {
-                console.log(`${branch}${branchHead}${toPrint}`);
+
+                if (toPrint !== '-1') {
+                    const outputDiv = document.getElementById('output');
+                    outputDiv.innerHTML += `${branch}${branchHead}${toPrint}\n`;
+                }
             }
 
             let baseBranch = branch;
@@ -118,7 +142,7 @@
 
     const tree = JSON.parse('{{tree_json}}');
     printTree(tree, node => node.name.toUpperCase(), node => node.children,)
-    console.log(tree)
+
 </script>
 </body>
 </html>

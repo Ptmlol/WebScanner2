@@ -7,7 +7,6 @@ def generate_tree(list):
         node_dict = {}
         tree = {'name': 'root', 'children': []}
         for pair in list:
-            print(pair)
             if pair[0] not in node_dict:
                 second_node = {'name': pair[1], 'children': []}
                 node = {'name': pair[0], 'children': [second_node]}

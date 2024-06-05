@@ -198,7 +198,8 @@ class DataStorage:
     def __init__(self):
         self.xss_inj = None
         self.urls = []
-        self.related_domains = []
+        self.related_domains = set()
+        self.links_other = set()
         self.sql_dict = {}
         self.html_inj = []
 
@@ -447,18 +448,19 @@ class Utilities(ScanConfigParameters):
                                                 self.url).group(1):
                             # Add URLs to main list object, ignore the user - ignored ones.
                             # [[a.html,b.html], [b.html,c.html], [a,d], [a,g], [g,h], [b,j]]
-                            if extracted_url not in self.DataStorage.urls:  # TODO: Remove cicles, print to HTML
+                            if extracted_url not in self.DataStorage.urls:
                                 for ignored_link in self.ignored_links:
                                     if str(ignored_link) not in str(extracted_url):
                                         self.link_pairs.append([url, extracted_url])
                                         self.DataStorage.urls.append(extracted_url)
                                         self.spider(extracted_url)
-                        else:  # TODO: Build site map by adding the related domains (other than the app domain) to a list (one hop only)
-                            self.DataStorage.related_domains.append(extracted_url)
+                        else:
+                            # self.DataStorage.related_domains.add(extracted_url)
+                            html_report.add_external_link(extracted_url)
             # IF it's not 200 and not 4XX, means that there are some ways of accessing the URL.
-            if response.status_code != 200 and response.status_code != 404 and response.status_code != 500:
-                # TODO: Create site map.
-                pass
+            if (response.status_code != 200 and response.status_code != 404 and response.status_code != 500) or (
+                    str(response.status_code).startswith('4') and response.status_code != 404):
+                self.DataStorage.links_other.add(url)  # TODO: Add to HTML report if exists as well, Prettify it.
             return
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when crawling for links.", url)
@@ -672,7 +674,6 @@ class Utilities(ScanConfigParameters):
                 else:
                     # If login is not required, perform crawling.
                     self.spider(url)
-            print(self.link_pairs)
             html_report.create_tree(self.link_pairs)
         except Exception as e:
             self.print_except_message('error', e,
