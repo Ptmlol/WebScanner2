@@ -227,7 +227,7 @@ class DataStorage:
                         self.html_inj = f.readlines()
                 f.close()
                 return self.html_inj
-            # https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20Injection #TODO: better filter XSS
+            # https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20Injection
             elif p_type == 'XSS':
                 for filename in os.listdir(os.getcwd() + '/Payloads/XSS'):
                     with open(os.path.join(os.getcwd() + '/Payloads/XSS', filename), 'r', encoding="utf8") as f:
@@ -443,9 +443,8 @@ class Utilities(ScanConfigParameters):
                     if href and not href.startswith('#'):
                         extracted_url = urllib.parse.urljoin(url, href)
                         # Ensure the app does not scan other webapps by checking if the harvested URL has the same domain as the URL provided by user.
-                        if re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", extracted_url).group(
-                                1) == re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)",
-                                                self.url).group(1):
+                        if re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)", extracted_url).group(1) == re.search("^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)",
+                                                                                                                                    self.url).group(1):
                             # Add URLs to main list object, ignore the user - ignored ones.
                             # [[a.html,b.html], [b.html,c.html], [a,d], [a,g], [g,h], [b,j]]
                             if extracted_url not in self.DataStorage.urls:
@@ -460,7 +459,7 @@ class Utilities(ScanConfigParameters):
             # IF it's not 200 and not 4XX, means that there are some ways of accessing the URL.
             if (response.status_code != 200 and response.status_code != 404 and response.status_code != 500) or (
                     str(response.status_code).startswith('4') and response.status_code != 404):
-                self.DataStorage.links_other.add(url)  # TODO: Add to HTML report if exists as well, Prettify it.
+                html_report.add_external_link(url)
             return
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when crawling for links.", url)
@@ -829,14 +828,15 @@ class Scanner(Utilities):
                 # # self.scan_browser_cache(url) # Ok, just whole app is vuln, temp comment
                 # # self.scan_session(url) # TODO : Fix Strong Sessions
                 # self.scan_xss(url)
-                # # self.t_i_xml(url) # TODO: Fix XML
+                self.t_i_xml(url)  # Fixing in progress
                 # self.scan_idor(url)
                 # self.scan_cors(url)
                 # self.scan_xst(url)
                 # self.scan_robotstxt(url)
                 # self.scan_hhi(url)
+                # self.scan_ssrf(url)
 
-                html_report.write_html_report()
+                html_report.write_html_report()  # TODO: Prettify report
             return
         except Exception as e:
             self.print_except_message('error', e,
@@ -1067,7 +1067,7 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
             pass
 
-    def t_i_code_exec(self, url, form, form_data):  # TODO: maybe add more payloads
+    def t_i_code_exec(self, url, form, form_data):
         try:
             # Detects blind and standard Code Exec (Ping for 3 seconds)
             code_exec_payload = "| ping -c 3 127.0.0.1"
@@ -1209,14 +1209,16 @@ class Scanner(Utilities):
                                       url)
             pass
 
-    def t_i_xml(self, url):
+    def t_i_xml(self, url):  # TODO: Check why XEE is not ran properly.
         try:
-            ajax_xml_urls = self.extract_non_form_inputs(url)
-            print(ajax_xml_urls)
-            # for sql_payload in self.DataStorage.payloads("SQL"):
-            #     response = self.session.get(action_url + sql_payload)
-            #     if "error" in response.text.lower():
-            #         return True
+            payload = 'file:///etc/passwd'
+            xml_payload = '''<!--?xml version="1.0" ?-->
+<!DOCTYPE replace [<!ENTITY ent SYSTEM "'"> ]>
+<reset>
+<login>bee</login>
+<secret>Any bugs?</secret>
+</reset>'''  # .format(payload)
+            print(self.session.post(url, data=xml_payload, headers={'Content-Type': 'application/xml'}).content)
             return False
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for XML Injection.", url)
@@ -1540,7 +1542,7 @@ class Scanner(Utilities):
                 html_report.add_vulnerability('Robots.txt',
                                               'Robots.txt contains the following values: \n{}'.format(
                                                   [i.replace("'", "") for i in robots_urls]),
-                                              'Informational')  # TODO: Pretify the print of robots contents to report
+                                              'Informational')  # TODO: Prettify the print of robots contents to report or to HTML report
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing Robots.txt.", url)
             pass
@@ -1572,6 +1574,33 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing for Host Header Injection.", url)
             pass
 
+    def t_i_ssrf(self, url):  # TODO: Add more payloads
+        try:
+            ssrf_payload = "=https://www.google.com/"
+            url = url.replace('=', ssrf_payload)
+            response = self.session.get(url)
+            if ssrf_payload in url and response.status_code == 200:
+                return True
+            ssrf_payload = '=file:///etc/passwd'
+            url = url.replace('=', ssrf_payload)
+            if ssrf_payload in url and "root:" in response.text.lower():
+                return True
+            return False
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)
+            pass
+
+    def scan_ssrf(self, url):
+        try:
+            if self.t_i_ssrf(url):
+                html_report.add_vulnerability('Server Side Request Forgery',
+                                              'Server Side Request Forgery (SSRF) vulnerability identified on URL: {}'.format(
+                                                  url), 'Low')
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)
+            pass
+
 
 class CreateUserSession(Utilities):  # TODO: Create another py module for the new user.
     try:
@@ -1584,7 +1613,7 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
         print("Error: ", e)
 
 
-#     def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths
+#     def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths/directory transversal all kinds - https://github.com/jcesarstef/dotdotslash
 
 # def javascript_exec(self, url):  # Add more payloads
 #     try:
@@ -1601,30 +1630,6 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #         return 'alert(testedforjavascriptcodeexecutionrn3284)' in str(response.text).lower()
 #     except Exception as e:
 #         print("\n[ERROR] Something went wrong when testing Javascript code execution. Error: ", e,
-#               file=self.error_file)
-#         print("[Error Info] LINK:", url, file=self.error_file)
-#         pass
-#
-#
-#
-# def ssrf_injection(self, url):  # Add more payloads
-#     try:
-#         try:
-#             my_gui.update_list_gui("Testing for SSRF Injection")
-#         except Exception:
-#             pass
-#         ssrf_payload = "=https://www.google.com/"
-#         url = url.replace('=', ssrf_payload)
-#         response = self.session.get(url)
-#         if response.status_code == 200:
-#             return True
-#         ssrf_payload = '=file:///etc/passwd'
-#         url = url.replace('=', ssrf_payload)
-#         if "root:" in self.get_content(url).text.lower():
-#             return True
-#         return False
-#     except Exception as e:
-#         print("\n[ERROR] Something went wrong when testing Server Side Request Forgery. Error: ", e,
 #               file=self.error_file)
 #         print("[Error Info] LINK:", url, file=self.error_file)
 #         pass
@@ -1794,61 +1799,6 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #             print("\n[ERROR] Something went wrong when testing LFI. Error: ", e, file=self.error_file)
 #             print("[Error Info] LINK:", url, file=self.error_file)
 #             print("[Error Info] SCRIPT:", script, file=self.error_file)
-#             pass
-#
-#     def rfi_script(self, url, script):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for RFI")
-#             except Exception:
-#                 pass
-#             rfi_script = script
-#             url = url.replace("=", "=" + rfi_script)
-#             if self.get_content(url).url != url:
-#                 return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing RFI. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             print("[Error Info] SCRIPT:", script, file=self.error_file)
-#             pass
-#
-#     def test_lfi_directory_transversal(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for LFI Directory Transversal")
-#             except Exception:
-#                 pass
-#             if self.local_file_inclusion(url):
-#                 return 1
-#             if "=" in url:
-#                 if server_set in linux_servers or server_set in mixed_servers:
-#                     if self.lfi_script(url, "../../../etc/passwd") or \
-#                             self.lfi_script(url, "../../../etc/passwd%00") or \
-#                             self.lfi_script(url, "%252e%252e%252fetc%252fpasswd") or \
-#                             self.lfi_script(url, "%252e%252e%252fetc%252fpasswd%00") or \
-#                             self.lfi_script(url, "%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd") or \
-#                             self.lfi_script(url, "%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd%00") or \
-#                             self.lfi_script(url, "....//....//etc/passwd") or \
-#                             self.lfi_script(url, "..///////..////..//////etc/passwd") or \
-#                             self.lfi_script(url, "/%5C../%5C../%5C../%5C../%5C../%5C../%5C../%5C../%5C../%5C../%5C../etc/passwd"):
-#                         return 1
-#                 elif server_set in windows_servers in mixed_servers:
-#                     if self.lfi_script(url, "../") or \
-#                             self.lfi_script(url, "..\/") or \
-#                             self.lfi_script(url, "%2e%2e%2f") or \
-#                             self.lfi_script(url, "%252e%252e%252f") or \
-#                             self.lfi_script(url, "%c0%ae%c0%ae%c0%af") or \
-#                             self.lfi_script(url, "%uff0e%uff0e%u2215") or \
-#                             self.lfi_script(url, "%uff0e%uff0e%u2216") or \
-#                             self.lfi_script(url, "..././"):
-#                         return 1
-#                 if self.rfi_script(url, "https://www.google.com/"):
-#                     return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing LFI directory transversal. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
 #             pass
 #
 #     def test_cookie_directory_transversal(self, url):
@@ -2141,16 +2091,6 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #             return
 #         except Exception as e:
 #             print("\n[ERROR] Something went wrong when testing Sensitive Data Exposure. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def test_xml_external_entities(self, url=None, test=False):
-#         try:
-#             if test:
-#                 if self.inject_xml(url):
-#                     links_xee_vuln.append(url)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing XML External Entities. Error: ", e, file=self.error_file)
 #             pass
 #
 #     def test_broken_access_control(self, url=None, test=False):

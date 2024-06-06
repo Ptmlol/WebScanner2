@@ -76,21 +76,30 @@
     {% endfor %}
 </div>
 
+{% if tree_json|length > 32 %}
 <div class="container">
-    {% if tree_json %}
     <h4>Application URL Map:</h4>
-    {% endif %}
     <pre class="details" id="output"></pre>
 </div>
+{% endif %}
 
+{% if external_links %}
 <div class="container">
-    {% if external_links %}
     <h4>External URLs:</h4>
-    {% endif %}
     {% for link in external_links %}
     <div class="details">{{ link }}</div>
     {% endfor %}
 </div>
+{% endif %}
+
+{% if non_accessible_links %}
+<div class="container">
+    <h4>External URLs:</h4>
+    {% for link in non_accessible_links %}
+    <div class="details">{{ link }}</div>
+    {% endfor %}
+</div>
+{% endif %}
 
 <div class="footer">
     &copy; 2024 Python Web Vulnerability Scanner - Naiboiu Teodor
