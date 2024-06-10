@@ -1686,9 +1686,9 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
         print("Error: ", e)
 
 
-#     def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths/directory transversal all kinds - https://github.com/jcesarstef/dotdotslash
+# def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths/directory transversal all kinds - https://github.com/jcesarstef/dotdotslash
 
-# def javascript_exec(self, url):  # Add more payloads
+# def javascript_exec(self, url):  # Add more payloads #TODO: Implement JS Exec
 #     try:
 #         try:
 #             my_gui.update_list_gui("Testing for JS Code Execution")
@@ -1707,39 +1707,10 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #         print("[Error Info] LINK:", url, file=self.error_file)
 #         pass
 
-# def check_hidden_path(self, h_path):
-#     try:
-#         try:
-#             my_gui.update_list_gui("Searching for hidden paths")
-#         except Exception:
-#             pass
-#         response = self.session.get(self.target_url + h_path)
-#         if response == 200:
-#             return True
-#         return False
-#     except Exception as e:
-#         print("\n[ERROR] Something went wrong when checking hidden paths. Error: ", e, file=self.error_file)
-#         print("[Error Info]  Hidden Path:", h_path, file=self.error_file)
-#         pass
-
-# # Get Info
-# def fingerprint(self, url):
-#     try:
-#         try:
-#             my_gui.update_list_gui("Fingerprinting application")
-#         except Exception:
-#             pass
-#         global server_set
-#         header_for_link = self.extract_headers(url)
-#         server_set.add(header_for_link["Server"])
-#         return
-#     except Exception as e:
-#         print("\n[ERROR] Something went wrong when searching for application server. Error: ", e, file=self.error_file)
-#         print("[Error Info] LINK:", url, file=self.error_file)
-#         pass
+# # Get Info # TODO: Get app information/versions with nmap
 
 #
-# def get_comments_dtds_scripts_from_content(self, url):
+# def get_comments_dtds_scripts_from_content(self, url): # TODO: Show comments separated
 #     try:
 #         try:
 #             my_gui.update_list_gui("Trying to get comments and scripts from source")
@@ -1764,99 +1735,10 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #         print("\n[ERROR] Something went wrong when trying to get comments from DOM. Error: ", e, file=self.error_file)
 #         print("[Error Info] LINK:", url, file=self.error_file)
 #         pass
-
-
-#     # Vulnerabilities
 #
 #     # A3:2017-Sensitive Data Exposure
-#     # checking certificate...
-#
-#     def check_tls(self, to_check=None):  # needs change
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing TLS")
-#             except Exception:
-#                 pass
-#             context = ssl.create_default_context()
-#             with socket.create_connection((self.target_url, 443)) as sockk:
-#                 with context.wrap_socket(sockk, server_hostname=self.target_url) as tlssock:
-#                     y = getattr(tlssock, to_check)
-#                     return y()
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking TLS. Most likely you don't have any certificate. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def check_tls_version(self):
-#         try:
-#             print("\nChecking TLS extensions version...", file=self.report_file)
-#             version = self.check_tls("version")
-#             if version:
-#                 found = True
-#             else:
-#                 found = False
-#             legacy_tls = [x.strip() for x in config_object["TLSVERSION"]["tlsversion"].split(',')]
-#             for legacy in legacy_tls:
-#                 if str(version).lower() == legacy:
-#                     print(version.lower, file=self.report_file)
-#                     print(
-#                         "[!!!-!!!] Found Legacy Version for TLS extension, this version contains cryptographic weaknesses: " + str(
-#                             version), file=self.report_file)
-#             if not found:
-#                 print("[???-???] Cannot find the version of the TLS extension...", file=self.report_file)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking TLS version. Most likely you don't have any certificate. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def check_tls_validity(self):
-#         try:
-#             print("\nChecking Validity of Digital Certificate...", file=self.report_file)
-#             sep = " "
-#             stripped = self.check_tls("getpeercert")["notAfter"].split(sep, -1)[:-1]
-#             if not stripped:
-#                 print("[???-???] Cannot check validity of the TLS extension...", file=self.report_file)
-#                 return
-#             str1 = " "
-#             good_date = str1.join(stripped)
-#             date_time_obj = datetime.strptime(good_date, '%b %d %H:%M:%S %Y')
-#             if not date_time_obj:
-#                 print("[???-???] Cannot check validity of the TLS extension...", file=self.report_file)
-#                 return
-#             print("Certificate expires in: ", date_time_obj-datetime.today(), file=self.report_file)
-#             return
-#         except Exception as e:
-#             print("[???-???] Cannot check validity of the TLS extension...", file=self.report_file)
-#             print("\n[ERROR] Something went wrong when checking TLS validity. Most likely you don't have any certificate. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def check_tls_issuer(self):
-#         try:
-#             print("\nChecking Digital Certificate Issuer...", file=self.report_file)
-#             ssl_context = ssl.create_default_context()
-#             with ssl_context.wrap_socket(socket.socket(), server_hostname=self.target_url) as s:
-#                 s.connect((self.target_url, 443))
-#                 cert = s.getpeercert()
-#             if cert:
-#                 subject = dict(x[0] for x in cert['subject'])
-#                 issued_to = subject['commonName']
-#                 issuer = dict(x[0] for x in cert['issuer'])
-#                 issued_by = issuer['commonName']
-#                 if issued_to and issued_by:
-#                     print("Digital Certificate is issued by: ", issued_by, file=self.report_file)
-#                     print("Digital Certificate is issued to: ", issued_to, file=self.report_file)
-#                     return
-#             else:
-#                 print("[???-???] Cannot check issuer of the TLS extension...", file=self.report_file)
-#                 return
-#         except Exception as e:
-#             print("[???-???] Cannot check issuer of the TLS extension...", file=self.report_file)
-#             print("\n[ERROR] Something went wrong when checking TLS issuer. Most likely you don't have any certificate. Error: ", e, file=self.error_file)
-#             pass
+#     # checking certificate... # TODO: Check TLS version and security
 
-
-#     # A5:2017-Broken Access Control
-#     # Directory Traversal File Include # https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/File%20Inclusion#basic-lfi
-#
 #     def lfi_script(self, url, script):
 #         try:
 #             try:
@@ -1872,92 +1754,6 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #             print("\n[ERROR] Something went wrong when testing LFI. Error: ", e, file=self.error_file)
 #             print("[Error Info] LINK:", url, file=self.error_file)
 #             print("[Error Info] SCRIPT:", script, file=self.error_file)
-#             pass
-#
-#     def test_cookie_directory_transversal(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for Cookie Directory Transversal")
-#             except Exception:
-#                 pass
-#             dummy_session = OtherUser(config_object["CREDENTIAL"]["username_2"], config_object["CREDENTIAL"]["known_password_2"], err_file=self.error_file).session
-#             cookie_dict = self.extract_cookies(url, dummy_session)
-#             key_list = list(cookie_dict.keys())
-#             for key in key_list:
-#                 dummy_session.cookies.set(key, "../")
-#                 if self.get_content(url, dummy_session).url is not url:
-#                     dummy_session.close()
-#                     return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing cookie directory transversal. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     # Bypassing Authorization Schema
-#     # Horizontal
-#
-#     def test_bypass_auth(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Trying to bypass authentication")
-#             except Exception:
-#                 pass
-#             if config_object["WEBURL"]["private_info_url"] == "None":
-#                 return
-#             first_user_session_id = None
-#             second_user_session_id = None
-#             response_first_user = None
-#             response_second_user = None
-#             dummy_user = OtherUser(config_object["CREDENTIAL"]["username_2"],
-#                                    config_object["CREDENTIAL"]["known_password_2"], url, err_file=self.error_file)
-#             dummy_session = dummy_user.session
-#             dummy_session.get(url)
-#             cookie_dict = self.extract_cookies(url, dummy_session)
-#             key_list = list(cookie_dict.keys())
-#             for key in key_list:
-#                 if key.lower() == "sid" or "sessionid" or "session" or "sessiontoken" or "sessid":
-#                     first_user_session_id = cookie_dict[key]
-#                 else:
-#                     return 0
-#
-#             if first_user_session_id:
-#                 second_user_session_id = dummy_user.get_sess_id()
-#             if second_user_session_id:
-#                 data = {
-#                     config_object["CREDENTIAL"]["username_field"]: config_object["CREDENTIAL"]["username"]
-#                 }
-#                 response_first_user = dummy_session.post(config_object["WEBURL"]["private_info_url"], data=data)
-#                 for key in key_list:
-#                     if key.lower() == "sid" or "sessionid" or "session" or "sessiontoken" or "sessid":
-#                         dummy_session.cookies.set(key, second_user_session_id)
-#                 response_second_user = dummy_session.post(config_object["WEBURL"]["private_info_url"], data=data)
-#             if response_first_user and response_second_user:
-#                 if str(response_first_user.text) == str(response_second_user.text):
-#                     return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when trying to bypass authentication. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     # Special Request Header
-#
-#     def test_special_req_header(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for special request headers")
-#             except Exception:
-#                 pass
-#             response_wo_headers = self.session.get(url)
-#             response_w_x_original = self.session.get(url, headers={"X-Original-URL": "/donotexistrandomstring1238123"})
-#             response_w_x_rewrite = self.session.get(url, headers={"X-Rewrite-URL": "/donotexistrandomstring1238123"})
-#             if response_wo_headers.status_code == 404 or response_w_x_original.status_code == 404 or response_w_x_rewrite.status_code == 404:
-#                 return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing special headers. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
 #             pass
 #
 #         # Privilege Escalation
@@ -2058,15 +1854,6 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #
 #     # MISC
 #
-#     def hidden_paths(self):
-#         try:
-#             if self.search_paths():
-#                 print("Possible Hidden Paths Found:", file=self.map_file)
-#                 print(*self.visited, sep="\n", file=self.map_file)
-#             return
-#         except Exception:
-#             pass
-#
 #     def admin_directories(self):
 #         try:
 #             try:
@@ -2085,109 +1872,6 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #         except Exception as e:
 #             print("\n[ERROR] Something went wrong when searching for admin directories. Error: ", e, file=self.error_file)
 #             pass
-#
-#     def create_return_merge_links(self):
-#         try:
-#             global final_list
-#             visible_links = len(self.target_links)
-#             invisible_links_length = len(self.visited)
-#             print("\nVisible Links Length:", visible_links, "\nHidden Links Length:", invisible_links_length, file=self.report_file)
-#             final_list = self.target_links + self.visited
-#             # print("\n[!!!-!!!] Performing tests on NOT hidden links", file=self.report_file)
-#             return visible_links, final_list
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when merging hidden links with visible links lists. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def gather_info(self, url=None):
-#         try:
-#             if not url:
-#                 try:
-#                     my_gui.update_list_gui("Gathering general information")
-#                 except Exception:
-#                     pass
-#                 print("\n\t\t\t############################# Web Application Architecture #############################", file=self.map_file)
-#                 print("\nFound links in this order:\n", file=self.map_file)
-#                 self.spider()
-#                 print("[END] End of visible links found!", file=self.map_file)
-#                 print("\n\nStarting search for hidden links..", file=self.map_file)
-#                 self.hidden_paths()
-#                 print("[END] End of hidden links found!\n", file=self.map_file)
-#                 print("\n[NMAP] Nmap Scan Results", file=self.report_file)
-#                 self.get_port_info(test=(True if config_object['TEST']['nmap_scan'].lower() == "true" else False))
-#                 print("[END] End of Nmap Scan Results", file=self.report_file)
-#             else:
-#                 self.fingerprint(url)
-#                 self.get_port(url)
-#                 self.get_comments_dtds_scripts_from_content(url)
-#             return
-#
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when gathering information about server running on application. Error: ", e, file=self.error_file)
-#             pass
-#
-#     # Test Suit Classifier
-#     def test_broken_auth(self, url=None, test=False):
-#         try:
-#             if test:
-#                 if not url:
-#                     self.admin_directories()
-#                 else:
-#                     if "=" in url:
-#                         if self.check_session_id(url):
-#                             print("\n[!!!-!!!]SessionID Hijack Vulnerability found", file=self.report_file)
-#                         if self.local_file_inclusion(url):
-#                             links_vulnerable_to_lfi.append(url)
-#                     else:
-#                         if self.test_role_definition_cookie(url):
-#                             links_potential_role_definition.append(url)
-#                         if self.test_browser_cache_weakness(url):
-#                             links_browser_cache_weakness.append(url)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Broken Authentication. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def test_sensitive_data_exposure(self, url=None, form=None, test=False):
-#         try:
-#             if test:
-#                 if not url:
-#                     self.check_tls_version()
-#                     self.check_tls_validity()
-#                     self.check_tls_issuer()
-#                 else:
-#                     if form:
-#                         if self.check_form_action(form):
-#                             links_forms__dict_sensitive_info[url] = form
-#                     elif self.check_secure_tag_cookie_sessid(url):
-#                         links_without_secure_cookie_with_sessid.append(url)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Sensitive Data Exposure. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def test_broken_access_control(self, url=None, test=False):
-#         try:
-#             if test:
-#                 if '=' in url:
-#                     if self.test_idor(url):
-#                         links_idor.append(url)
-#                 else:
-#                     if self.test_lfi_directory_transversal(url):
-#                         links_lfi_directory_transversal.append(url)
-#                     if self.test_cookie_directory_transversal(url):
-#                         links_cookie_directory_transversal.append(url)
-#                     if self.test_special_req_header(url):
-#                         links_special_header.append(url)
-#                     if self.test_bypass_auth(url):
-#                         links_bypass_authorization.append(url)
-#                     if self.test_privilege_escalation(url):
-#                         links_privilege_escal.append(url)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Broken Access Control. Error: ", e, file=self.error_file)
-#             pass
-#
 
 if __name__ == '__main__':
     try:
@@ -2238,7 +1922,9 @@ if __name__ == '__main__':
                     Scanner = Scanner(args.url, comprehensive_scan=args.comprehensive_scan)
                 else:
                     Scanner = Scanner('http://' + args.url, comprehensive_scan=args.comprehensive_scan)
+
         Scanner.scan()
+
     except Exception as e:
         print(Fore.RED + "\n[ERROR] FATAL ERROR OCCURRED. Quitting..\n")
         print(Fore.RESET)
