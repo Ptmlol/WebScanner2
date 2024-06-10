@@ -670,9 +670,6 @@ class Utilities(ScanConfigParameters):
                         quit()
                     elif self.process_login(username, password, sec_level):
                         self.DataStorage.urls.append(url)
-                else:
-                    # If login is not required, perform crawling.
-                    self.spider(url)
             html_report.create_tree(self.link_pairs)
         except Exception as e:
             self.print_except_message('error', e,
@@ -850,7 +847,6 @@ class Scanner(Utilities):
                 self.scan_hhi(url)
                 self.scan_ssrf(url)
                 self.scan_xml_generic(url)
-
                 html_report.write_html_report()  # TODO: Prettify report
             return
         except Exception as e:
