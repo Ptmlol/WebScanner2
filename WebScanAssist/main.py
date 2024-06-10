@@ -240,7 +240,7 @@ class DataStorage:
             print("Error: ", e)
             pass
 
-    def inject_type(self, p_type):  # TODO: Pritify the injection types to match human readable formats.
+    def inject_type(self, p_type):  # TODO: Prettify the injection types to match human readable formats.
         try:
             # Based on filename, get the injection type, used for SQL primary.
             for key, value in self.sql_dict.items():
@@ -829,24 +829,27 @@ class Scanner(Utilities):
             # Scan harvested URLs
             for url in self.DataStorage.urls:
                 # Form and URL scan
-                self.scan_html(url)
-                self.scan_iframe(url)
-                self.scan_code_exec(url)
-                self.scan_php_exec(url)
-                self.scan_ssi(url)
-                self.scan_sql(url)
-                self.scan_role_def_dir(url)
-                self.scan_role_def_cookie(url)
-                # # self.scan_browser_cache(url) # Ok, just whole app is vuln, temp comment
+                # self.scan_html(url)
+                # self.scan_iframe(url)
+                # self.scan_code_exec(url)
+                # self.scan_php_exec(url)
+                # self.scan_ssi(url)
+                # self.scan_sql(url)
+                # self.scan_role_def_dir(url)
+                # self.scan_role_def_cookie(url)
+                # self.scan_browser_cache(url) # Ok, just whole app is vuln, temp comment
                 # # self.scan_session(url) # TODO : Fix Strong Sessions
-                self.scan_xss(url)
-                self.scan_idor(url)
-                self.scan_cors(url)
-                self.scan_xst(url)
-                self.scan_robotstxt(url)
-                self.scan_hhi(url)
-                self.scan_ssrf(url)
-                self.scan_xml_generic(url)
+                # self.scan_xss(url)
+                # self.scan_idor(url)
+                # self.scan_cors(url)
+                # self.scan_xst(url)
+                # self.scan_robotstxt(url)
+                # self.scan_hhi(url)
+                # self.scan_ssrf(url)
+                # self.scan_xml_generic(url)
+                #self.scan_lfi(url)
+                self.t_i_js(url)
+
                 html_report.write_html_report()  # TODO: Prettify report
             return
         except Exception as e:
@@ -972,7 +975,6 @@ class Scanner(Utilities):
                 if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
                     return True
                 if "error" in response.text.lower():  # TODO: Might need to create other detection condition.
-
                     return True
             return False
         except Exception as e:
@@ -1566,7 +1568,8 @@ class Scanner(Utilities):
             if self.session.get(url).headers['Access-Control-Allow-Origin'] == '*':
                 return True
             return False
-        except Exception:
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for CORS.", url)
             pass
 
     def scan_cors(self, url):
@@ -1600,8 +1603,6 @@ class Scanner(Utilities):
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for XST.", url)
             pass
-
-    # TODO: Further misconfigs can be found with after nmap and after URL scraping is configured
 
     def scan_robotstxt(self, url):  # https://github.com/danielmiessler/RobotsDisallowed/blob/master/top1000.txt
         try:  # TODO: Create detection of sensitive data in this robots by the above URL
@@ -1674,6 +1675,60 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)
             pass
 
+    def t_i_lfi(self, url):
+        try:
+            lfi_script = '../../../etc/passwd'
+            if '=' in url:
+                url = url.replace("=", "=" + lfi_script)
+                if "root:" in self.session.get(url).text.lower():
+                    return True
+            form_list, form_data_list = self.extract_forms_and_form_data(url)
+            for index, form in enumerate(form_list):
+                injection_keys = self.extract_injection_fields_from_form(form_data_list[index])
+                # for html_payload in self.DataStorage.payloads("HTML"): #TODO: Add more payloads LFI/RFI
+                lfi_script = '../../../etc/passwd'
+                # Inject each payload into each injection point
+                for injection_key in injection_keys:
+                    form_data_list[index][injection_key] = lfi_script
+                response_injected = self.submit_form(url, form, form_data_list[index])
+                if "root:" in response_injected.text.lower():
+                    return True
+            return False
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Local File Inclusion (LFI).", url)
+            pass
+
+    def scan_lfi(self, url):
+        try:
+            if self.t_i_lfi(url):
+                html_report.add_vulnerability('Local File Inclusion (LFI)', 'Local File Inclusion (LFI) vulnerability identified on URL: {}'.format(url), 'High')
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Local File Inclusion (LFI).", url)
+            pass
+
+    def t_i_js(self, url):
+        try:
+            js_payload = '/?javascript:alert(testedforjavascriptcodeexecutionrn3284)' # TODO: Add more payloads
+            if url[-1] != '/':
+                new_url = url + js_payload
+                return js_payload in str(self.session.get(new_url).text).lower()
+            else:
+                new_url = url + js_payload[1:]
+                return js_payload[1:] in str(self.session.get(new_url).text).lower()
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
+            pass
+
+    def scan_js(self, url):
+        try:
+            if self.t_i_js(url):
+                html_report.add_vulnerability('Javascript Code Injection', 'Javascript Code Injection vulnerability identified on URL: {}'.format(url), 'High')
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
+            pass
+
 
 class CreateUserSession(Utilities):  # TODO: Create another py module for the new user.
     try:
@@ -1687,35 +1742,9 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 
 
 # def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths/directory transversal all kinds - https://github.com/jcesarstef/dotdotslash
-
-# def javascript_exec(self, url):  # Add more payloads #TODO: Implement JS Exec
-#     try:
-#         try:
-#             my_gui.update_list_gui("Testing for JS Code Execution")
-#         except Exception:
-#             pass
-#         js_payload = '/?javascript:alert(testedforjavascriptcodeexecutionrn3284)'
-#         if url[-1] != '/':
-#             new_url = url + js_payload
-#         else:
-#             new_url = url + js_payload[1:]
-#         response = self.session.get(new_url)
-#         return 'alert(testedforjavascriptcodeexecutionrn3284)' in str(response.text).lower()
-#     except Exception as e:
-#         print("\n[ERROR] Something went wrong when testing Javascript code execution. Error: ", e,
-#               file=self.error_file)
-#         print("[Error Info] LINK:", url, file=self.error_file)
-#         pass
-
 # # Get Info # TODO: Get app information/versions with nmap
-
-#
 # def get_comments_dtds_scripts_from_content(self, url): # TODO: Show comments separated
 #     try:
-#         try:
-#             my_gui.update_list_gui("Trying to get comments and scripts from source")
-#         except Exception:
-#             pass
 #         global comment_set, dtd_url
 #         content = self.session.get(url)
 #         comments = re.findall('(?<=<!--)(.*)(?=-->)', str(content.text))
@@ -1736,55 +1765,10 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #         print("[Error Info] LINK:", url, file=self.error_file)
 #         pass
 #
-#     # A3:2017-Sensitive Data Exposure
 #     # checking certificate... # TODO: Check TLS version and security
-
-#     def lfi_script(self, url, script):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for LFI")
-#             except Exception:
-#                 pass
-#             lfi_script = script
-#             url = url.replace("=", "=" + lfi_script)
-#             if "root:" in self.get_content(url).text.lower():
-#                 return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing LFI. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             print("[Error Info] SCRIPT:", script, file=self.error_file)
-#             pass
-#
-#         # Privilege Escalation
-#
-#     def test_privilege_escalation(self, url):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing for privilege escalation")
-#             except Exception:
-#                 pass
-#             response = self.session.get(url)
-#             if "grp" or "group" or "role" in str(response.text).lower() or "grp" or "group" or "role" in response.url.lower():
-#                 for data in privilege_data:
-#                     response = self.session.post(url, data=data)
-#                     if response.status_code != 401:
-#                         return 1
-#             if "X-Forwarded-For:" in response.headers:
-#                 print("\n[WARN] X-Forwarded-For header present on link: ", file=self.report_file)
-#                 print(url, file=self.report_file)
-#                 print("Hackers may change the IP value!", file=self.report_file)
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing privilege escalation. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#
 #
 #     # A6:2017-Security Misconfigurations
 #     # Test File Extensions Handling for Sensitive Information
-#     # Present Extensions (analyze robots.txt)
 #
 #     # HTTP Methods
 #
@@ -1803,10 +1787,6 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #
 #     def test_hsts(self):
 #         try:
-#             try:
-#                 my_gui.update_list_gui("Testing HSTS")
-#             except Exception:
-#                 pass
 #             headers = self.extract_headers(config_object['WEBURL']['target'])
 #             if 'strict' not in str(headers).lower():
 #                 return True
@@ -1836,41 +1816,6 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
 #         except Exception as e:
 #             print("\n[ERROR] Something went wrong when testing RIA. Error: ", e, file=self.error_file)
 #             print("[Error Info] LINK LIST:", link_list, file=self.error_file)
-#             pass
-#
-#     # Test LFI
-#
-#     def local_file_inclusion(self, url):
-#         try:
-#             lfi_script = "~"
-#             url = url.replace("=", "=" + lfi_script)
-#             if self.check_response(url):
-#                 return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing LFI. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK:", url, file=self.error_file)
-#             pass
-#
-#     # MISC
-#
-#     def admin_directories(self):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Searching for admin directories")
-#             except Exception:
-#                 pass
-#             links_admin_path = []
-#             has_admin_directories = self.test_role_definition_directories()
-#             if has_admin_directories:
-#                 for link in has_admin_directories:
-#                     links_admin_path.append(link)
-#                 print("\n[!!!---???] Possible Admin Path discovered for links:", file=self.report_file)
-#                 print(*links_admin_path, sep="\n", file=self.report_file)
-#                 print("[END] End of admin paths", file=self.report_file)
-#             return
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when searching for admin directories. Error: ", e, file=self.error_file)
 #             pass
 
 if __name__ == '__main__':
