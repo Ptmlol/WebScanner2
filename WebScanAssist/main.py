@@ -1,3 +1,4 @@
+import html
 import platform
 import random
 import ssl
@@ -1506,7 +1507,7 @@ class Scanner(Utilities):
                 response_injected = self.submit_form(url, form, form_data)
                 if not response_injected:
                     return False, 0
-                if xss_payload.lower() in response_injected.text.lower():
+                if (xss_payload.lower() in response_injected.text.lower()) or xss_payload.lower() in html.unescape(response_injected.text.lower()):
                     confidence += 1
                 if self.comprehensive_scan is False and confidence > 0:
                     return True, confidence
