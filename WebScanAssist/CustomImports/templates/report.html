@@ -16,10 +16,10 @@
 
         .container {
             width: 80%;
-            margin: 0 auto;
+            margin: 5px auto;
             padding: 20px;
             background-color: #fff;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 5px 0 10px rgba(0, 0, 0, 0.1);
         }
 
         h1 {
@@ -56,6 +56,37 @@
             padding: 20px 0;
             color: #aaa;
         }
+        .url-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .url-list li {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            transition: box-shadow 0.3s ease;
+        }
+        .url-list li:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .url-list a {
+            color: #007BFF;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .url-list a:hover {
+            text-decoration: underline;
+        }
+        .item-list {
+            list-style-type: disc;
+            margin: 10px 0 0 20px;
+            padding: 0;
+        }
+        .item-list li {
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
@@ -83,20 +114,39 @@
 </div>
 {% endif %}
 
-{% if external_links %}
-<div class="container">
-    <h4>External URLs:</h4>
-    {% for link in external_links %}
-    <div class="details">{{ link }}</div>
-    {% endfor %}
-</div>
-{% endif %}
-
 {% if non_accessible_links %}
 <div class="container">
     <h4>External URLs:</h4>
     {% for link in non_accessible_links %}
-    <div class="details">{{ link }}</div>
+    <div class="item-list">{{ link }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if comments_dict %}
+<div class="container">
+    <h4>URL Comments:</h4>
+    <ol class="item-list">
+        {% for url, value in comments_dict.items() %}
+        <li>
+            <a href="{{ url }}">{{ url }}/</a>
+            <ul class="url-list">
+                {% for elem in value %}
+               <li><pre>{{ elem|e }}</pre></li>
+                {% endfor %}
+            </ul>
+        </li>
+        {% endfor %}
+    </ol>
+</div>
+{% endif %}
+
+
+{% if external_links %}
+<div class="container">
+    <h4>External URLs:</h4>
+    {% for link in external_links %}
+    <div class="item-list">{{ link }}</div>
     {% endfor %}
 </div>
 {% endif %}

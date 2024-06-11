@@ -8,6 +8,8 @@ vulnerabilities = []
 tree_json = {}
 external_links = set()
 non_accessible_links = set()
+comments_dict = {}
+
 try:
     def add_vulnerability(v_type, details, confidence='Critical'):
         temp_dict = {'type': v_type, 'details': details, 'severity': confidence}
@@ -35,6 +37,11 @@ try:
         non_accessible_links.add(external)
         return
 
+    def add_comments(external):
+        global comments_dict
+        comments_dict.update(external)
+        return
+
 
     def write_html_report():
         try:
@@ -44,7 +51,7 @@ try:
 
             # Render the template with the data
             output = template.render(vulnerabilities=vulnerabilities, tree_json=tree_json, external_links=external_links,
-                                     non_accessible_links=non_accessible_links)
+                                     non_accessible_links=non_accessible_links, comments_dict=comments_dict)
             # Save the output to a file
             with open('vulnerability_report.html', 'w', encoding='utf-8') as f:
                 f.write(output)

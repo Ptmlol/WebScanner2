@@ -240,9 +240,9 @@ class DataStorage:
             print("Error: ", e)
             pass
 
-    def inject_type(self, p_type):  # TODO: Prettify the injection types to match human readable formats.
+    def inject_type(self, p_type):
         try:
-            # Based on filename, get the injection type, used for SQL primary.
+            # Based on filename, get the injection type, used for SQL.
             for key, value in self.sql_dict.items():
                 if isinstance(value, list) and p_type in value:
                     return key
@@ -708,7 +708,7 @@ class Utilities(ScanConfigParameters):
             self.print_except_message('error', e, "Something went wrong when extracting form and form data", url)
             pass
 
-    def no_form_input_content(self, url, payload):  # TODO: Need to get the .JS from sources also to work flawlessly
+    def no_form_input_content(self, url, payload):
         try:
             # Extract inputs outside of form or with no method/action in form
             input_list_fin = set()
@@ -814,6 +814,26 @@ class Utilities(ScanConfigParameters):
             self.print_except_message('error', e, "Something went wrong when extracting XML tags.", url)
             pass
 
+    def pretty_sql(self, sql_type_input):
+        try:
+            if sql_type_input == "{'auth_sql'}":
+                return 'Authentication Bypass SQL Injection'
+            elif sql_type_input == "{'error_sql'}":
+                return 'Error Based SQL Injection'
+            elif sql_type_input == "{'generic_sql'}":
+                return 'Generic SQL Injection'
+            elif sql_type_input == "{'sqlite_sql'}":
+                return 'SQLite SQL Injection'
+            elif sql_type_input == "{'time_based_sql'}":
+                return 'Time Based SQL Injection'
+            elif sql_type_input == "{'union_select_sql'}":
+                return 'Union Select SQL Injection'
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when SQL Types.")
+            pass
+
+
 # Scanner class handles scan jobs
 class Scanner(Utilities):
     def __init__(self, url, username=None, password=None, static_scan=None, comprehensive_scan=None):
@@ -829,26 +849,31 @@ class Scanner(Utilities):
             # Scan harvested URLs
             for url in self.DataStorage.urls:
                 # Form and URL scan
-                # self.scan_html(url)
-                # self.scan_iframe(url)
-                # self.scan_code_exec(url)
-                # self.scan_php_exec(url)
-                # self.scan_ssi(url)
-                # self.scan_sql(url)
-                # self.scan_role_def_dir(url)
-                # self.scan_role_def_cookie(url)
-                # self.scan_browser_cache(url) # Ok, just whole app is vuln, temp comment
-                # # self.scan_session(url) # TODO : Fix Strong Sessions
-                # self.scan_xss(url)
-                # self.scan_idor(url)
-                # self.scan_cors(url)
-                # self.scan_xst(url)
-                # self.scan_robotstxt(url)
-                # self.scan_hhi(url)
-                # self.scan_ssrf(url)
-                # self.scan_xml_generic(url)
-                #self.scan_lfi(url)
-                self.t_i_js(url)
+
+                self.scan_html(url)
+                self.scan_iframe(url)
+                self.scan_code_exec(url)
+                self.scan_php_exec(url)
+                self.scan_ssi(url)
+                self.scan_sql(url)
+                self.scan_role_def_dir(url)
+                self.scan_role_def_cookie(url)
+                self.scan_browser_cache(url)
+                # self.scan_session(url) # TODO : Fix Strong Sessions
+                self.scan_xss(url)
+                self.scan_idor(url)
+                self.scan_cors(url)
+                self.scan_xst(url)
+                self.scan_robotstxt(url)
+                self.scan_hhi(url)
+                self.scan_ssrf(url)
+                self.scan_xml_generic(url)
+                self.scan_lfi(url)
+                self.scan_js(url)
+                self.scan_comments(url)
+                self.scan_http(url)
+                self.scan_hsts(url)
+                self.scan_ria(url)
 
                 html_report.write_html_report()  # TODO: Prettify report
             return
@@ -900,7 +925,7 @@ class Scanner(Utilities):
                     time_based = True
                     continue
 
-                if "error" in response_injected.text.lower():  # TODO: Might need to create other detection condition.
+                if "error" in response_injected.text.lower():
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
                 # Check if comprehensive scan is required, if not, jump out on 3 vulnerabilities hit, for time management.
@@ -948,7 +973,7 @@ class Scanner(Utilities):
                 # Check response type (time or feedback)
                 if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
                     return True
-                if "error" in response.text.lower():  # TODO: Might need to create other detection condition.
+                if "error" in response.text.lower():
                     return True
             return False
         except Exception as e:
@@ -974,7 +999,7 @@ class Scanner(Utilities):
                 # Check response type (time or feedback)
                 if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
                     return True
-                if "error" in response.text.lower():  # TODO: Might need to create other detection condition.
+                if "error" in response.text.lower():
                     return True
             return False
         except Exception as e:
@@ -993,11 +1018,11 @@ class Scanner(Utilities):
                     if 0 < sql_conf <= 3:
                         html_report.add_vulnerability('SQL Injection',
                                                       'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}.'.format(
-                                                          url, sql_type), 'Medium')
+                                                          url, self.pretty_sql(str(sql_type))), 'Medium')
                     else:
                         html_report.add_vulnerability('SQL Injection',
                                                       'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}'.format(
-                                                          url, sql_type), 'Critical')
+                                                          url, self.pretty_sql(str(sql_type))), 'Critical')
             # Bulk up User-Agent SQL Injection detection in the same function
             if self.t_i_ua_sql(url):
                 html_report.add_vulnerability('SQL Injection - User Agent',
@@ -1254,20 +1279,24 @@ class Scanner(Utilities):
 
     def t_i_xml(self, url, payload):
         try:
+            # Extract injectable tags from URL
             extracted_uri, extracted_tag = self.extract_xml_tags(url)
+            # If injectable tags exists
             if extracted_uri and extracted_tag:
+                # Get the first content of the first identified tag and inject it with the custom XXE variable
                 prepared_tag =  re.sub(r'(<[^>]+>)([^<]+)(</[^>]+>)', r'\1' + '&XXE;' + r'\3', extracted_tag, count=1)
-
+                # Prepare the payload with with specific requirements such as identified tags.
                 xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
                 <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
                 {}'''.format(payload, prepared_tag)
 
+                # Prepare URL for injection, URL consist of custom POST request of XML.
                 pattern_url = r'(.*/)[^/]+$'
                 prepared_url = re.sub(pattern_url, r'\1' + extracted_uri, url)
 
+                # Return the pre build URL and the custom XML payload
                 return prepared_url, xml_payload
-                # if 'root:' in str(self.session.post(prepared_url, data=xml_payload, headers={'Content-Type': 'application/xml'}).content):
-                #     return True, 'HIGH'
+            # Generic attempt to XML Injection, inject custom payload in fake tags.
             else:
                 xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
                                 <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
@@ -1282,6 +1311,7 @@ class Scanner(Utilities):
     def scan_xml_generic(self, url):
         try:
             payload = 'file:///etc/passwd' # TODO: Might need to add other payloads
+            # Get the custom values of the page and try to inject them if possible.
             custom_url, custom_payload = self.t_i_xml(url, payload)
             if custom_url and custom_payload:
                 response = self.session.post(custom_url, data=custom_payload, headers={'Content-Type': 'application/xml'})
@@ -1289,6 +1319,7 @@ class Scanner(Utilities):
                     html_report.add_vulnerability('XXE Injection',
                                                   'XXE Injection Vulnerability identified on URL: {}.'.format(
                                                       url), 'Critical')
+            # If specific injection cannot be performed, try generic approach.
             elif custom_url is None and custom_payload:
                 if 'error' in str(self.session.post(url, data=payload, headers={'Content-Type': 'application/xml'}).content):
                     html_report.add_vulnerability('XXE Injection',
@@ -1303,6 +1334,7 @@ class Scanner(Utilities):
 
     def t_ba_role_definition_cookie(self):
         try:
+            # Search for specific keywords that define roles in the cookies.
             cookie_dict = self.extract_cookies()
             if "isadmin" in str(cookie_dict).lower():
                 if str(cookie_dict.lower()["isAdmin"]).lower() == "true" or \
@@ -1334,6 +1366,7 @@ class Scanner(Utilities):
             pass
 
     def t_ba_role_definition_directories(self, url):
+        # Search for specific keywords that define roles in the URLs
         try:
             link = url.lower()
             if "admin" in link or "administrator" in link or "mod" in link or "moderator" in link:
@@ -1356,6 +1389,7 @@ class Scanner(Utilities):
             pass
 
     def t_ba_session(self, url):
+        # Search for session in the cookie.
         try:
             cookie_dict = self.extract_cookies()
             if ("sid" or "sessionid" or "session" or "sessiontoken" or "sessid") in str(cookie_dict).lower():
@@ -1565,11 +1599,11 @@ class Scanner(Utilities):
 
     def t_cors(self, url):
         try:
-            if self.session.get(url).headers['Access-Control-Allow-Origin'] == '*':
-                return True
-            return False
+                if self.session.get(url).headers['Access-Control-Allow-Origin'] == '*':
+                    return True
+                return
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for CORS.", url)
+            # Blank by design.
             pass
 
     def scan_cors(self, url):
@@ -1729,6 +1763,60 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
             pass
 
+    def scan_comments(self, url):
+        try:
+            # Get comments from the DOM on each URL.
+            comm_dict = {}
+            comments = re.findall('(?<=<!--)(.*)(?=-->)', str(self.session.get(url).text))
+            comm_dict.update({url: comments})
+            # Print comments to report
+            html_report.add_comments(comm_dict)
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
+            pass
+
+    def scan_http(self, url):
+        try:
+            response = self.session.put(str(self.url) + '/test.html', data={"test": 'test'})
+            if str(response.status_code).startswith("3") or str(response.status_code).startswith("2"):
+                html_report.add_vulnerability('HTTP PUT Method Vulnerability', 'Application accepts custom PUT data on URL: {}'.format(url), 'Low')
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
+            pass
+
+    # HTTP Strict Transport Security
+    def scan_hsts(self, url):
+        try:
+            headers = self.extract_headers(url)
+            if 'strict' not in str(headers).lower():
+                html_report.add_vulnerability('HTTP Strict Transport Security not found',
+                                              'Application might be vulnerable to sniffing and certificate invalidation attacks. URL: {}'.format(url), 'Low')
+
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing Strict Transport on headers.", url)
+            pass
+
+
+    def scan_ria(self, url):
+        try:
+            content = None
+            if 'clientaccesspolicy.xml' in url.lower() or 'crossdomain.xml' in url.lower():
+                content = self.session.get(url)
+            try:
+                if '*' in content:
+                    html_report.add_vulnerability('Overly Permissive Policy File found',
+                                                  'Review Crossdomain.xml / Clientaccesspolicy.xml files. URL: {}'.format(
+                                                      url), 'Low')
+            except TypeError:
+                pass
+            return
+        except Exception as e:
+            self.print_except_message('error', e, "Something went wrong when testing RIA.", url)
+            pass
+
 
 class CreateUserSession(Utilities):  # TODO: Create another py module for the new user.
     try:
@@ -1741,82 +1829,10 @@ class CreateUserSession(Utilities):  # TODO: Create another py module for the ne
         print("Error: ", e)
 
 
-# def search_paths(self): # TODO: Find way to find hidden URLs/ alternative paths/directory transversal all kinds - https://github.com/jcesarstef/dotdotslash
-# # Get Info # TODO: Get app information/versions with nmap
-# def get_comments_dtds_scripts_from_content(self, url): # TODO: Show comments separated
-#     try:
-#         global comment_set, dtd_url
-#         content = self.session.get(url)
-#         comments = re.findall('(?<=<!--)(.*)(?=-->)', str(content.text))
-#         if 'strict.dtd' in str(content.text).lower() or 'loose.dtd' in str(content.text).lower() or 'frameset.dtd' in str(content.text).lower():
-#             dtd_url.append(url)
-#         if comments:
-#             comments_list = [comm for comm in comments if comm]
-#             for comm in comments_list:
-#                 comment_set.add(comm)
-#         js_inside_html = re.findall('(?<=<script>)(.*)(?=</script>)', str(content.text).lower())
-#         if js_inside_html:
-#             js_code_list = [code for code in js_inside_html if code]
-#             for js_code in js_code_list:
-#                 script_set.add(js_code)
-#         return
-#     except Exception as e:
-#         print("\n[ERROR] Something went wrong when trying to get comments from DOM. Error: ", e, file=self.error_file)
-#         print("[Error Info] LINK:", url, file=self.error_file)
-#         pass
-#
-#     # checking certificate... # TODO: Check TLS version and security
-#
-#     # A6:2017-Security Misconfigurations
-#     # Test File Extensions Handling for Sensitive Information
-#
-#     # HTTP Methods
-#
-#     def test_http(self):
-#         try:
-#             test_data = {"test": 'test'}
-#             response = self.session.put(str(config_object['WEBURL']['target']) + '/test.html', data=test_data)
-#             if str(response.status_code).startswith("3") or str(response.status_code).startswith("2"):
-#                 return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing HTTP Methods. Error: ", e, file=self.error_file)
-#             pass
-#
-#     # HTTP Strict Transport Security
-#
-#     def test_hsts(self):
-#         try:
-#             headers = self.extract_headers(config_object['WEBURL']['target'])
-#             if 'strict' not in str(headers).lower():
-#                 return True
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing Strict Transport on headers. Error: ", e, file=self.error_file)
-#             pass
-#
-#     # Test RIA
-#
-#     def test_ria(self, link_list):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing RIA")
-#             except Exception:
-#                 pass
-#             content = None
-#             for link in link_list:
-#                 if 'clientaccesspolicy.xml' in link.lower() or 'crossdomain.xml' in link.lower():
-#                     content = self.session.get(link)
-#                 try:
-#                     if '*' in content:
-#                         return True
-#                 except TypeError:
-#                     pass
-#             return False
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when testing RIA. Error: ", e, file=self.error_file)
-#             print("[Error Info] LINK LIST:", link_list, file=self.error_file)
-#             pass
+# Get hidden Paths # TODO: Find way to find hidden URLs/ alternative paths/directory transversal all kinds - https://github.com/jcesarstef/dotdotslash
+# Get Info # TODO: Get app information/versions with nmap
+# Check SSL Certificate # TODO: Check TLS version and security
+
 
 if __name__ == '__main__':
     try:
