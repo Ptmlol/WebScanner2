@@ -124,10 +124,12 @@
 {% endif %}
 
 {% if comments_dict %}
+{% if comments_dict|length > 1 %}
 <div class="container">
     <h4>URL Comments:</h4>
     <ol class="item-list">
         {% for url, value in comments_dict.items() %}
+        {% if value %}
         <li>
             <a href="{{ url }}">{{ url }}/</a>
             <ul class="url-list">
@@ -136,9 +138,11 @@
                 {% endfor %}
             </ul>
         </li>
+        {% endif %}
         {% endfor %}
     </ol>
 </div>
+{% endif %}
 {% endif %}
 
 
@@ -178,6 +182,7 @@
                 if (toPrint !== '-1') {
                     const outputDiv = document.getElementById('output');
                     outputDiv.innerHTML += `${branch}${branchHead}${toPrint}\n`;
+                    console.log(`${branch}${branchHead}${toPrint}`);
                 }
             }
 

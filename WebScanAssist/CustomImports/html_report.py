@@ -48,7 +48,6 @@ try:
             # Load the template
             env = Environment(loader=FileSystemLoader('CustomImports/templates'))
             template = env.get_template('report.html')
-
             # Render the template with the data
             output = template.render(vulnerabilities=vulnerabilities, tree_json=tree_json, external_links=external_links,
                                      non_accessible_links=non_accessible_links, comments_dict=comments_dict)

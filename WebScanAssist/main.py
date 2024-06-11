@@ -848,14 +848,30 @@ class Scanner(Utilities):
 
     def scan(self):
         try:
+            # Scan app
+            self.scan_browser_cache()
+            print('scan_browser_cache')
+            self.scan_xst()
+            print('scan_xst')
+            self.scan_hhi()
+            print('scan_hhi')
+            self.scan_http()
+            print('scan_http')
+            self.scan_hsts()
+            print('scan_hsts')
+            self.scan_ria()
+            print('scan_ria')
+            self.scan_robotstxt()
+            print('scan_robotstxt')
+
             # Scan harvested URLs
             # print(self.DataStorage.urls)
             for url in self.DataStorage.urls:
                 print(url)
-                # Form and URL scan
-
+                # # Form and URL scan
+                #
                 #self.scan_html(url)
-                #print('scan_html')
+                print('scan_html')
                 self.scan_iframe(url)
                 print('scan_iframe')
                 self.scan_code_exec(url)
@@ -870,22 +886,14 @@ class Scanner(Utilities):
                 print('scan_role_def_dir')
                 self.scan_role_def_cookie(url)
                 print('scan_role_def_cookie')
-                self.scan_browser_cache(url)
-                print('scan_browser_cache')
                 # self.scan_session(url) # TODO : Fix Strong Sessions
-                print('scan_session')
+                #print('scan_session')
                 self.scan_xss(url)
                 print('scan_xss')
                 self.scan_idor(url)
                 print('scan_idor')
                 self.scan_cors(url)
                 print('scan_cors')
-                self.scan_xst(url)
-                print('scan_xst')
-                self.scan_robotstxt(url)
-                print('scan_robotstxt')
-                self.scan_hhi(url)
-                print('scan_hhi')
                 self.scan_ssrf(url)
                 print('scan_ssrf')
                 self.scan_xml_generic(url)
@@ -896,12 +904,6 @@ class Scanner(Utilities):
                 print('scan_js')
                 self.scan_comments(url)
                 print('scan_comments')
-                self.scan_http(url)
-                print('scan_http')
-                self.scan_hsts(url)
-                print('scan_hsts')
-                self.scan_ria(url)
-                print('scan_ria')
 
             html_report.write_html_report()  # TODO: Prettify report
             return
@@ -1078,7 +1080,6 @@ class Scanner(Utilities):
             confidence = 0
             injection_keys = self.extract_injection_fields_from_form(form_data)
             for html_payload in self.DataStorage.payloads("HTML"):
-                print(html_payload)
                 # Inject each payload into each injection point
                 for injection_key in injection_keys:
                     form_data[injection_key] = html_payload
@@ -1459,14 +1460,14 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing browser cache.", url)
             pass
 
-    def scan_browser_cache(self, url):
+    def scan_browser_cache(self):
         try:
-            if self.t_ba_browser_cache_weakness(url):
+            if self.t_ba_browser_cache_weakness(self.url):
                 html_report.add_vulnerability('Cache Weakness',
                                               'Potential Browser Cache Weakness vulnerability identified.'.format(
-                                                  url), 'Low')
+                                                  self.url), 'Low')
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing browser cache.", url)
+            self.print_except_message('error', e, "Something went wrong when testing browser cache.", self.url)
             pass
 
     def t_ba_strong_session(self, url, cookies):
@@ -1656,23 +1657,23 @@ class Scanner(Utilities):
         except Exception:
             pass
 
-    def scan_xst(self, url):
+    def scan_xst(self):
         try:
-            if self.t_xst(url):
+            if self.t_xst(self.url):
                 html_report.add_vulnerability('Cross-Site Tracing (XST)',
                                               'Cross-Site Tracing (XST) vulnerability identified on URL: {}'.format(
-                                                  url), 'Low')
+                                                  self.url), 'Low')
             return
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for XST.", url)
+            self.print_except_message('error', e, "Something went wrong when testing for XST.", self.url)
             pass
 
-    def scan_robotstxt(self, url):  # https://github.com/danielmiessler/RobotsDisallowed/blob/master/top1000.txt
+    def scan_robotstxt(self):  # https://github.com/danielmiessler/RobotsDisallowed/blob/master/top1000.txt
         try:  # TODO: Create detection of sensitive data in this robots by the above URL
-            if 'robots' not in url and self.static_scan is None:
-                url_robots = urllib.parse.urljoin(url, '/robots.txt')
+            if 'robots' not in self.url and self.static_scan is None:
+                url_robots = urllib.parse.urljoin(self.url, '/robots.txt')
             else:
-                url_robots = url
+                url_robots = self.url
             req_robots = self.session.get(url_robots)
             robots_urls = re.findall('Disallow: (.*)', req_robots.text)
             if robots_urls:
@@ -1681,7 +1682,7 @@ class Scanner(Utilities):
                                                   [i.replace("'", "") for i in robots_urls]),
                                               'Informational')  # TODO: Prettify the print of robots contents to report or to HTML report
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing Robots.txt.", url)
+            self.print_except_message('error', e, "Something went wrong when testing Robots.txt.", self.url)
             pass
 
     # Sensitive Data Exposure
@@ -1700,15 +1701,15 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing Host Header Injection.", url)
             pass
 
-    def scan_hhi(self, url):
+    def scan_hhi(self):
         try:
-            if self.t_i_host_header(url):
+            if self.t_i_host_header(self.url):
                 html_report.add_vulnerability('Host-Header Injection',
                                               'Host-Header Injection vulnerability identified on URL: {}'.format(
-                                                  url), 'Low')
+                                                  self.url), 'Low')
             return
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for Host Header Injection.", url)
+            self.print_except_message('error', e, "Something went wrong when testing for Host Header Injection.", self.url)
             pass
 
     def t_i_ssrf(self, url):  # TODO: Add more payloads
@@ -1805,45 +1806,45 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
             pass
 
-    def scan_http(self, url):
+    def scan_http(self):
         try:
             response = self.session.put(str(self.url) + '/test.html', data={"test": 'test'})
             if str(response.status_code).startswith("3") or str(response.status_code).startswith("2"):
-                html_report.add_vulnerability('HTTP PUT Method Vulnerability', 'Application accepts custom PUT data on URL: {}'.format(url), 'Low')
+                html_report.add_vulnerability('HTTP PUT Method Vulnerability', 'Application accepts custom PUT data on URL: {}'.format(self.url), 'Low')
             return
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
+            self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", self.url)
             pass
 
     # HTTP Strict Transport Security
-    def scan_hsts(self, url):
+    def scan_hsts(self):
         try:
-            headers = self.extract_headers(url)
+            headers = self.extract_headers(self.url)
             if 'strict' not in str(headers).lower():
                 html_report.add_vulnerability('HTTP Strict Transport Security not found',
-                                              'Application might be vulnerable to sniffing and certificate invalidation attacks. URL: {}'.format(url), 'Low')
+                                              'Application might be vulnerable to sniffing and certificate invalidation attacks. URL: {}'.format(self.url), 'Low')
 
             return
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing Strict Transport on headers.", url)
+            self.print_except_message('error', e, "Something went wrong when testing Strict Transport on headers.", self.url)
             pass
 
 
-    def scan_ria(self, url):
+    def scan_ria(self):
         try:
             content = None
-            if 'clientaccesspolicy.xml' in url.lower() or 'crossdomain.xml' in url.lower():
-                content = self.session.get(url)
+            if 'clientaccesspolicy.xml' in self.url.lower() or 'crossdomain.xml' in self.url.lower():
+                content = self.session.get(self.url)
             try:
                 if '*' in content:
                     html_report.add_vulnerability('Overly Permissive Policy File found',
                                                   'Review Crossdomain.xml / Clientaccesspolicy.xml files. URL: {}'.format(
-                                                      url), 'Low')
+                                                      self.url), 'Low')
             except TypeError:
                 pass
             return
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing RIA.", url)
+            self.print_except_message('error', e, "Something went wrong when testing RIA.", self.url)
             pass
 
 
