@@ -197,7 +197,7 @@ firstCallSpider = 1
 class DataStorage:
     def __init__(self):
         self.xss_inj = None
-        self.urls = []
+        self.urls = set()
         self.related_domains = set()
         self.links_other = set()
         self.sql_dict = {}
@@ -430,10 +430,14 @@ class Utilities(ScanConfigParameters):
             if firstCallSpider:
                 self.link_pairs.append(['-1', url])
                 response = self.session.get(url)
-                self.DataStorage.urls.append(url)
+                #print("Provided URL", url)
+                #print("Actual URL", self.session.get(url).url)
+                self.DataStorage.urls.add(url)
                 firstCallSpider = 0
             else:
                 response = self.session.get(url)
+            #print("Provided URL", url)
+            #print("Actual URL", self.session.get(url).url)
             # If 200, then endpoint is accessible
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, "html.parser")
@@ -447,12 +451,10 @@ class Utilities(ScanConfigParameters):
                                                                                                                                     self.url).group(1):
                             # Add URLs to main list object, ignore the user - ignored ones.
                             # [[a.html,b.html], [b.html,c.html], [a,d], [a,g], [g,h], [b,j]]
-                            if extracted_url not in self.DataStorage.urls:
-                                for ignored_link in self.ignored_links:
-                                    if str(ignored_link) not in str(extracted_url):
-                                        self.link_pairs.append([url, extracted_url])
-                                        self.DataStorage.urls.append(extracted_url)
-                                        self.spider(extracted_url)
+                            if extracted_url not in self.DataStorage.urls and not any(ignored in extracted_url for ignored in self.ignored_links):
+                                self.link_pairs.append([url, extracted_url])
+                                self.DataStorage.urls.add(extracted_url)
+                                self.spider(extracted_url)
                         else:
                             # self.DataStorage.related_domains.add(extracted_url)
                             html_report.add_external_link(extracted_url)
@@ -592,9 +594,9 @@ class Utilities(ScanConfigParameters):
 
             # Send data accordingly to method.
             if method == 'GET':
-                response = self.session.get(action_url, params=form_data, timeout=300)
+                response = self.session.get(action_url, params=form_data, timeout=10)
             else:
-                response = self.session.post(action_url, data=form_data, timeout=300)
+                response = self.session.post(action_url, data=form_data, timeout=10)
             response.raise_for_status()
             return response
         except requests.HTTPError as e:
@@ -669,7 +671,7 @@ class Utilities(ScanConfigParameters):
                         print("You need to provide login credentials first, check --help for details!")
                         quit()
                     elif self.process_login(username, password, sec_level):
-                        self.DataStorage.urls.append(url)
+                        self.DataStorage.urls.add(url)
             html_report.create_tree(self.link_pairs)
         except Exception as e:
             self.print_except_message('error', e,
@@ -757,7 +759,7 @@ class Utilities(ScanConfigParameters):
                         return True
             return False
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when checking for hidden inputs.", url)
+            # Ignore if input not found
             pass
 
     def print_except_message(self, m_type, error=None, custom_message=None, url=None):
@@ -847,35 +849,61 @@ class Scanner(Utilities):
     def scan(self):
         try:
             # Scan harvested URLs
+            # print(self.DataStorage.urls)
             for url in self.DataStorage.urls:
+                print(url)
                 # Form and URL scan
 
-                self.scan_html(url)
+                #self.scan_html(url)
+                #print('scan_html')
                 self.scan_iframe(url)
+                print('scan_iframe')
                 self.scan_code_exec(url)
+                print('scan_code_exec')
                 self.scan_php_exec(url)
+                print('scan_php_exec')
                 self.scan_ssi(url)
+                print('scan_ssi')
                 self.scan_sql(url)
+                print('scan_sql')
                 self.scan_role_def_dir(url)
+                print('scan_role_def_dir')
                 self.scan_role_def_cookie(url)
+                print('scan_role_def_cookie')
                 self.scan_browser_cache(url)
+                print('scan_browser_cache')
                 # self.scan_session(url) # TODO : Fix Strong Sessions
+                print('scan_session')
                 self.scan_xss(url)
+                print('scan_xss')
                 self.scan_idor(url)
+                print('scan_idor')
                 self.scan_cors(url)
+                print('scan_cors')
                 self.scan_xst(url)
+                print('scan_xst')
                 self.scan_robotstxt(url)
+                print('scan_robotstxt')
                 self.scan_hhi(url)
+                print('scan_hhi')
                 self.scan_ssrf(url)
+                print('scan_ssrf')
                 self.scan_xml_generic(url)
+                print('scan_xml_generic')
                 self.scan_lfi(url)
+                print('scan_lfi')
                 self.scan_js(url)
+                print('scan_js')
                 self.scan_comments(url)
+                print('scan_comments')
                 self.scan_http(url)
+                print('scan_http')
                 self.scan_hsts(url)
+                print('scan_hsts')
                 self.scan_ria(url)
+                print('scan_ria')
 
-                html_report.write_html_report()  # TODO: Prettify report
+            html_report.write_html_report()  # TODO: Prettify report
             return
         except Exception as e:
             self.print_except_message('error', e,
@@ -1050,6 +1078,7 @@ class Scanner(Utilities):
             confidence = 0
             injection_keys = self.extract_injection_fields_from_form(form_data)
             for html_payload in self.DataStorage.payloads("HTML"):
+                print(html_payload)
                 # Inject each payload into each injection point
                 for injection_key in injection_keys:
                     form_data[injection_key] = html_payload
