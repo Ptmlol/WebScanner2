@@ -9,6 +9,7 @@ import argparse
 from CustomImports import html_report
 import re
 from Classes.Utilities import Utilities
+from Tests import InjectionIframe, InjectionSql
 
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
@@ -16,9 +17,8 @@ warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 # Scanner class handles scan jobs
 class Scanner(Utilities):
-    def __init__(self, url, username=None, password=None, static_scan=None, comprehensive_scan=None):
+    def __init__(self, url, username=None, password=None, static_scan=None):
         Utilities.__init__(self, url)
-        self.comprehensive_scan = comprehensive_scan
         self.static_scan = static_scan
         self.check_scan_build_url(url, username, password, static_scan)
         self.username = username
@@ -40,11 +40,11 @@ class Scanner(Utilities):
                 # Form and URL scan
                 #
                 #self.scan_html(url) # Check why so slow
-                self.scan_iframe(url)
+                InjectionSql.run(url)
+                InjectionIframe.run(url)
                 # self.scan_code_exec(url)
                 # self.scan_php_exec(url)
                 # self.scan_ssi(url)
-                # self.scan_sql(url)
                 # self.scan_role_def_dir(url)
                 # self.scan_role_def_cookie(url)
                 # # self.scan_session(url) # TODO : Fix Strong Sessions
@@ -66,166 +66,8 @@ class Scanner(Utilities):
 
     # Injections
 
-    def t_i_sql(self, url, form, form_data):
-        try:
-            # Initialize default Confidence for forms/URLs and SQL types list
-            confidence = 0
-            sql_type_list = set()
-            time_based = False
-            # Get Initial ~ normal response time with no Payload
-            response_wo_1 = self.submit_form(url, form, "")
-            if not response_wo_1:
-                return 0, 0, 0
-            response_time_wo_1 = response_wo_1.elapsed.total_seconds()
-            response_time_wo_2 = self.submit_form(url, form, "").elapsed.total_seconds()
-            response_time_wo_3 = self.submit_form(url, form, "").elapsed.total_seconds()
 
-            if not response_time_wo_1 or not response_time_wo_2 or not response_time_wo_3:
-                return 0, 0, 0
-
-            # Create average response time
-            avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3) / 3
-
-            # Find the injection points for the SQL Payload
-            injection_keys = self.extract_injection_fields_from_form(form_data)
-            for sql_payload in self.DataStorage.payloads("SQL"):
-                # Populate injection keys with payloads.
-                for injection_key in injection_keys:
-                    form_data[injection_key] = sql_payload
-                # Check time based only once, heavy load on time of execution.
-                if (time_based and confidence > 2) and self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
-                    continue
-                response_injected = self.submit_form(url, form, form_data)
-                if not response_injected:
-                    continue
-                payload_response_time = response_injected.elapsed.total_seconds()
-                # Get time of response and check.
-                if payload_response_time > avg_response_time and payload_response_time > 2:  # and (time_based is False or confidence < 2):
-                    # Vulnerable to Time based SQL type X, increase confidence
-                    confidence += 1
-                    sql_type_list.add(self.DataStorage.inject_type(sql_payload))
-                    time_based = True
-
-                if "error" in response_injected.text.lower(): # TODO: Fix generic FP rate for 'error' alone in response.
-                    confidence += 1
-                    sql_type_list.add(self.DataStorage.inject_type(sql_payload))
-                # Check if comprehensive scan is required, if not, jump out on 3 vulnerabilities hit, for time management.
-
-                if self.comprehensive_scan is False and confidence > 1:
-                    return True, sql_type_list, confidence
-                # Check if vulnerability is found or not, if comprehensive is required.
-                elif self.comprehensive_scan is True and sql_payload == self.DataStorage.payloads("SQL")[
-                    -1] and confidence > 0:
-                    return True, sql_type_list, confidence
-            return False, [], 0
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)
-            pass
-
-    def t_i_sql_nfi(self, url):
-        try:
-            for sql_payload in self.DataStorage.payloads("SQL"):
-                if not self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
-                    continue
-                response_injected = self.no_form_input_content(url, sql_payload)
-                if not response_injected:
-                    return 0
-                for response_inj in response_injected:
-                    if response_inj.elapsed.total_seconds() > 4.5:
-                        return True
-            return False
-        except Exception as e:
-            self.print_except_message('error', e,
-                                      "Something went wrong when testing for SQL Injection with no form inputs.", url)
-            pass
-
-    def t_i_ua_sql(self, url):
-        try:
-            # Get Initial ~ normal response time with no Payload
-            response_time_wo = self.session.get(url, timeout=300).elapsed.total_seconds()
-            # Check only one time injection as it keeps the app loading for a long time if all time payloads are injected
-            for sql_payload in self.DataStorage.payloads("SQL"):
-                # Inject headers with payloads
-                headers = self.custom_user_agent(sql_payload)
-                try:
-                    response = self.session.get(url, timeout=300, headers=headers)
-                except Exception:
-                    continue
-                # Check response type (time or feedback)
-                if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
-                    return True
-                if "error" in response.text.lower():
-                    return True
-            return False
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for User-Agent SQL Injection.",
-                                      url)
-            pass
-
-    def t_i_xml_sql(self, url):
-        try:
-            # Get Initial ~ normal response time with no Payload
-            response_time_wo = self.session.get(url, timeout=300).elapsed.total_seconds()
-            # Check only one time injection as it keeps the app loading for a long time if all time payloads are injected
-            for sql_payload in self.DataStorage.payloads("SQL"):
-                # Inject XML with custom payloads
-                prepared_url, custom_payload = self.t_i_xml(url, sql_payload)
-                if prepared_url and custom_payload:
-                    try:
-                        response = self.session.post(prepared_url, data=custom_payload, headers={'Content-Type': 'application/xml'})
-                    except Exception:
-                        continue
-                else:
-                    break
-                # Check response type (time or feedback)
-                if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
-                    return True
-                if "error" in response.text.lower():
-                    return True
-            return False
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for SQL Injection in XML tags.",
-                                      url)
-            pass
-
-    def scan_sql(self, url):
-        try:
-            # Scan inputs in form
-            form_list, form_data_list = self.extract_forms_and_form_data(url)
-            for index, form in enumerate(form_list):
-                # Test SQL Injections and print results
-                sql_vuln, sql_type, sql_conf = self.t_i_sql(url, form, form_data_list[index])
-                if sql_vuln:
-                    if 0 < sql_conf <= 3:
-                        html_report.add_vulnerability('SQL Injection',
-                                                      'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}.'.format(
-                                                          url, self.pretty_sql(str(sql_type))), 'Medium')
-                    else:
-                        html_report.add_vulnerability('SQL Injection',
-                                                      'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}'.format(
-                                                          url, self.pretty_sql(str(sql_type))), 'Critical')
-            # Bulk up User-Agent SQL Injection detection in the same function
-            if self.t_i_ua_sql(url):
-                html_report.add_vulnerability('SQL Injection - User Agent',
-                                              'SQL Injection vulnerability identified on URL: {} using custom User-Agent.'.format(
-                                                  url), 'Critical')
-
-            # Scan inputs outside forms/with no actionable form
-            if self.t_i_sql_nfi(url):
-                html_report.add_vulnerability('SQL Injection',
-                                              'Time based (Blind) SQL Injection vulnerability identified on URL: {}.'.format(
-                                                  url), 'Medium')
-
-            if self.t_i_xml_sql(url):
-                html_report.add_vulnerability('SQL Injection in XML tag',
-                                              'SQL Injection in XML tag vulnerability identified on URL: {} using custom XML tags.'.format(
-                                                  url), 'Critical')
-            return
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)
-            pass
-
-    def t_i_html(self, url, form, form_data): # TODO: Remove comprehensive tag
+    def t_i_html(self, url, form, form_data):
         # TODO: Think of a method for adding confidence dynamically
         try:
             # Select injection points from form details
@@ -241,9 +83,9 @@ class Scanner(Utilities):
                 # Check for html_payload (tags included) in response, success execution if available.
                 if html_payload in response_injected.text:
                     confidence += 1
-                if self.comprehensive_scan is False and confidence > 0:
+                if confidence > 0:
                     return True, confidence
-                elif self.comprehensive_scan is True and html_payload == self.DataStorage.payloads("HTML")[
+                elif html_payload == self.DataStorage.payloads("HTML")[
                     -1] and confidence > 0:
                     return True, confidence
             return False, 0
@@ -290,31 +132,6 @@ class Scanner(Utilities):
                                                   url), 'Medium')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing HTML Injection.", url)
-            pass
-
-    def t_i_iframe(self, url, iframe):
-        try:
-            # iFrame payload is another page.
-            iframe_payload = 'https://www.google.com'
-            iframe_url = self.build_iframe_url(url, iframe, iframe_payload)
-            # If iFrame loads the new page it means it is vulnerable.
-            if iframe_url:
-                if iframe_payload in self.session.get(iframe_url).text.lower():
-                    html_report.add_vulnerability('iFrame Injection',
-                                                  'iFrame Injection Vulnerability identified on URL: {}.'.format(
-                                                      url), 'Low')
-            return
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
-            pass
-
-    def scan_iframe(self, url):
-        try:
-            # Perform tests for each iFrame
-            for iframe in self.extract_iframes(url):
-                self.t_i_iframe(url, iframe)
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
             pass
 
     def t_i_code_exec(self, url, form, form_data):
@@ -461,42 +278,12 @@ class Scanner(Utilities):
                                       url)
             pass
 
-    def t_i_xml(self, url, payload):
-        try:
-            # Extract injectable tags from URL
-            extracted_uri, extracted_tag = self.extract_xml_tags(url)
-            # If injectable tags exists
-            if extracted_uri and extracted_tag:
-                # Get the first content of the first identified tag and inject it with the custom XXE variable
-                prepared_tag =  re.sub(r'(<[^>]+>)([^<]+)(</[^>]+>)', r'\1' + '&XXE;' + r'\3', extracted_tag, count=1)
-                # Prepare the payload with specific requirements such as identified tags.
-                xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
-                <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
-                {}'''.format(payload, prepared_tag)
-
-                # Prepare URL for injection, URL consist of custom POST request of XML.
-                pattern_url = r'(.*/)[^/]+$'
-                prepared_url = re.sub(pattern_url, r'\1' + extracted_uri, url)
-
-                # Return the pre-build URL and the custom XML payload
-                return prepared_url, xml_payload
-            # Generic attempt to XML Injection, inject custom payload in fake tags.
-            else:
-                xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
-                                <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
-                                <bongus><bongus2>&XXE</bongus2><bongus3>&XXE</bongus3></bongus>'''.format(payload)
-                # if 'error' in str(self.session.post(url, data=xml_payload, headers={'Content-Type': 'application/xml'}).content):
-                #     return True, 'Low'
-                return None, xml_payload
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when testing for XML Injection.", url)
-            pass
         
     def scan_xml_generic(self, url):
         try:
             payload = 'file:///etc/passwd' # TODO: Might need to add other payloads
             # Get the custom values of the page and try to inject them if possible.
-            custom_url, custom_payload = self.t_i_xml(url, payload)
+            custom_url, custom_payload = self.prepare_xml_inj(url, payload)
             if custom_url and custom_payload:
                 response = self.session.post(custom_url, data=custom_payload, headers={'Content-Type': 'application/xml'})
                 if 'root' in response.text.lower():
@@ -662,9 +449,9 @@ class Scanner(Utilities):
                     continue
                 if (str(xss_payload).lower() in str(response_injected.text).lower()) or (str(xss_payload).lower() in str(html.unescape(response_injected.text.lower()))):
                     confidence += 1
-                if self.comprehensive_scan is False and confidence > 0:
+                if confidence > 0:
                     return True, confidence
-                elif self.comprehensive_scan is True and xss_payload == self.DataStorage.payloads("XSS")[
+                elif xss_payload == self.DataStorage.payloads("XSS")[
                     -1] and confidence > 0:
                     return True, confidence
             return False, 0
@@ -1032,10 +819,6 @@ if __name__ == '__main__':
         # Provide static scan argument, default is crawling. Static (or single) only tests the provided URL.
         parser.add_argument("-s", "--static_scan", help="Scan a single URL provided in the terminal",
                             action="store_true", default=False)
-        # Comprehensive tests forces the all tests to be performed.
-        parser.add_argument("-c", "--comprehensive_scan",
-                            help="Scan the application against all vulnerability tests available", action="store_true",
-                            default=False)
 
         args = parser.parse_args()
         # If username and password is provided, continue with checking if static flag is required or not.
@@ -1043,33 +826,27 @@ if __name__ == '__main__':
             if args.static_scan:
                 # Sent the relevant arguments in relation to the required scan type.
                 if re.match('^http|https?://', args.url):
-                    Scanner = Scanner(args.url, args.username, args.password, static_scan=args.static_scan,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner(args.url, args.username, args.password, static_scan=args.static_scan)
                 else:
-                    Scanner = Scanner('http://' + args.url, args.username, args.password, static_scan=args.static_scan,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner('http://' + args.url, args.username, args.password, static_scan=args.static_scan)
             # If static scan not required, continue without flag and perform scan type.
             else:
                 if re.match('^http|https?://', args.url):
-                    Scanner = Scanner(args.url, args.username, args.password,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner(args.url, args.username, args.password)
                 else:
-                    Scanner = Scanner('http://' + args.url, args.username, args.password,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner('http://' + args.url, args.username, args.password)
         # If no username AND password is provided, determine scan type and try to scan. If username and password are required but not provided, app will throw an error.
         elif not (args.username and args.password):
             if args.static_scan:
                 if re.match('^http|https?://', args.url):
-                    Scanner = Scanner(args.url, static_scan=args.static_scan,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner(args.url, static_scan=args.static_scan)
                 else:
-                    Scanner = Scanner('http://' + args.url, static_scan=args.static_scan,
-                                      comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner('http://' + args.url, static_scan=args.static_scan)
             else:
                 if re.match('^http|https?://', args.url):
-                    Scanner = Scanner(args.url, comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner(args.url)
                 else:
-                    Scanner = Scanner('http://' + args.url, comprehensive_scan=args.comprehensive_scan)
+                    Scanner = Scanner('http://' + args.url)
 
         Scanner.scan()
 

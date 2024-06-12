@@ -7,22 +7,26 @@ from Classes.DataStorage import DataStorage
 from Config import config
 
 
-class ScanConfigParameters:
+class ScanConfig:
+    # Initialize Session for current run
+    session = requests.Session()
+    # Initialize the ignored links and errors file parameters
+    err_file = None
+    ignored_links = None
     def __init__(self, url):
         try:
             # Initialize Scanner Configuration Parameters.
             self.url = url
-            # Initialize Session for current run
-            self.session = requests.Session()
+
+            
             # Initialize Data Storage.
             self.DataStorage = DataStorage()
             # Initialize Config File
             self.config_params = config.Config().config_object
             # Empty list of links pairs used for hierarchy.
             self.link_pairs = []
-            # Initialize the ignored links and errors file parameters
-            self.ignored_links = None
-            self.err_file = None
+
+
             # Setup initial requirements and prepare files.
             self.setup()
 
@@ -53,10 +57,10 @@ class ScanConfigParameters:
 
         try:  # Create Error file
             # Try to read an exiting error file, create one is none is found.
-            self.err_file = open('err_file.log', 'a')
+            err_file = open('err_file.log', 'a')
             # Check if file is empty before writing.
             if os.stat('err_file.log').st_size == 0:
-                self.err_file.write("Error File\n")
+                err_file.write("Error File\n")
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong when opening the Error File. Quitting..\n")
             print(Fore.RESET)

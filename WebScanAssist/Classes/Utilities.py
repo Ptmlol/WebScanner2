@@ -1,4 +1,4 @@
-from Classes.ScanConfigParameters import ScanConfigParameters
+from Classes.ScanConfig import ScanConfig
 from bs4 import BeautifulSoup
 from bs4 import MarkupResemblesLocatorWarning
 import warnings
@@ -16,9 +16,9 @@ firstCallSpider = 1
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 
-class Utilities(ScanConfigParameters):
+class Utilities(ScanConfig):
     def __init__(self, url):  # Inherits Config Class
-        ScanConfigParameters.__init__(self, url)
+        ScanConfig.__init__(self, url)
 
     def process_login(self, username, password, sec_level=None):
         try:
@@ -32,7 +32,7 @@ class Utilities(ScanConfigParameters):
                     print("Login Failed. Make sure you provided the right credentials.")
                     quit()
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when attempting to process the login.")
+            Utilities.print_except_message('error', e, "Something went wrong when attempting to process the login.")
             quit()
 
     def do_login(self, url, username, password, sec_level=None):
@@ -65,7 +65,7 @@ class Utilities(ScanConfigParameters):
                     return True
             return False
         except Exception as e:
-            self.print_except_message('error', e,
+            Utilities.print_except_message('error', e,
                                       "Something went wrong when attempting to extract the login details. Quitting..",
                                       url)
             quit()
@@ -78,7 +78,7 @@ class Utilities(ScanConfigParameters):
                 self.check_sec_input(sec_level)
             return sec_level
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when checking security level (BWapp).")
+            Utilities.print_except_message('error', e, "Something went wrong when checking security level (BWapp).")
             pass
 
     def spider(self, url):
@@ -122,7 +122,7 @@ class Utilities(ScanConfigParameters):
                 html_report.add_external_link(url)
             return
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when crawling for links.", url)
+            Utilities.print_except_message('error', e, "Something went wrong when crawling for links.", url)
             pass
 
     def extract_headers(self, url):
@@ -130,26 +130,28 @@ class Utilities(ScanConfigParameters):
             # Get headers of an URL.
             return self.session.get(url).headers
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when getting the headers.", url)
+            Utilities.print_except_message('error', e, "Something went wrong when getting the headers.", url)
             pass
 
-    def extract_forms(self, url):
+    @staticmethod
+    def extract_forms(url):
         try:
             # Extract all forms from an URL.
-            response = self.session.get(url, timeout=300)
+            response = ScanConfig.session.get(url, timeout=300)
             response.raise_for_status()
             parsed_html = BeautifulSoup(response.content, "html.parser")
             return parsed_html.findAll("form")
         except requests.HTTPError as e:
-            self.print_except_message('error', e,
+            Utilities.print_except_message('error', e,
                                       "Something went wrong when extracting forms from links. A HTTP error occurred.",
                                       url)
             pass
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting forms from links.", url)
+            Utilities.print_except_message('error', e, "Something went wrong when extracting forms from links.", url)
             pass
 
-    def extract_form_details(self, form):
+    @staticmethod
+    def extract_form_details(form):
         form_data = {}
         try:
             # Extract input fields and their names from the form
@@ -161,7 +163,7 @@ class Utilities(ScanConfigParameters):
                         continue
                     form_data[field.get('name')] = ''  # might need back field.get('value', '')
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting forms details.")
+            Utilities.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
 
         try:
@@ -174,7 +176,7 @@ class Utilities(ScanConfigParameters):
                         continue
                     form_data[field.get('name')] = '' # field.get('value', 'submit')
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting forms details.")
+            Utilities.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
 
         try:
@@ -184,7 +186,7 @@ class Utilities(ScanConfigParameters):
                 if field.get('name'):
                     form_data[field.get('name')] = ''
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting forms details.")
+            Utilities.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
 
         try:
@@ -194,25 +196,10 @@ class Utilities(ScanConfigParameters):
                 if field.get('name'):
                     form_data[field.get('name')] = ''
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting forms details.")
+            Utilities.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
         return form_data
 
-    def extract_iframes(self, url):
-        try:
-            # Extract iFrames the same way forms are extracted
-            response = self.session.get(url, timeout=300)
-            response.raise_for_status()
-            parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
-            return parsed_html.findAll("iframe")
-        except requests.HTTPError as e:
-            self.print_except_message('error', e,
-                                      "Something went wrong when extracting iframes from links. A HTTP error occurred",
-                                      url)
-            pass
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting iframes from links.", url)
-            pass
 
     def extract_inputs(self, url):
         try:
@@ -222,26 +209,16 @@ class Utilities(ScanConfigParameters):
             parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
             return parsed_html.findAll("input")
         except requests.HTTPError as e:
-            self.print_except_message('error', e,
+            Utilities.print_except_message('error', e,
                                       "Something went wrong when extracting inputs from links. A HTTP error occurred",
                                       url)
             pass
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting inputs from links.", url)
+            Utilities.print_except_message('error', e, "Something went wrong when extracting inputs from links.", url)
             pass
 
-    def build_iframe_url(self, url, iframe, payload):
-        try:  # Get the src value of the iframe to get the destination of the payload.
-            url = url.copy()
-            if iframe['src'] in url:
-                url = url.replace(iframe['src'], payload)
-                return url
-            return None
-        except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when building iframe URL.", url)
-            pass
-
-    def submit_form(self, url, form, form_data):
+    @staticmethod
+    def submit_form(url, form, form_data):
         try:
             # Get the action (URL or PATH)
             action = form.get("action")
@@ -260,28 +237,62 @@ class Utilities(ScanConfigParameters):
                 action_url = url
             # Send data accordingly to method.
             if method == 'GET':
-                response = self.session.get(action_url, params=form_data, timeout=10)
+                response = ScanConfig.session.get(action_url, params=form_data, timeout=10)
             else:
-                response = self.session.post(action_url, data=form_data, timeout=10)
+                response = ScanConfig.session.post(action_url, data=form_data, timeout=10)
             response.raise_for_status()
             return response
         except requests.HTTPError:
             # pass as the application is unable to handle the error
-            # self.print_except_message('error', e, "Something went wrong when submitting a form. A HTTP error occurred", url)
+            # Utilities.print_except_message('error', e, "Something went wrong when submitting a form. A HTTP error occurred", url)
             pass
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when submitting a form.", url)
+            Utilities.print_except_message('error', e, "Something went wrong when submitting a form.", url)
             pass
 
-    def custom_user_agent(self, user_agent):
+    @staticmethod
+    def prepare_xml_inj(url, payload):
+        try:
+            # Extract injectable tags from URL
+            extracted_uri, extracted_tag = Utilities.extract_xml_tags(url)
+            # If injectable tags exists
+            if extracted_uri and extracted_tag:
+                # Get the first content of the first identified tag and inject it with the custom XXE variable
+                prepared_tag =  re.sub(r'(<[^>]+>)([^<]+)(</[^>]+>)', r'\1' + '&XXE;' + r'\3', extracted_tag, count=1)
+                # Prepare the payload with specific requirements such as identified tags.
+                xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
+                <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
+                {}'''.format(payload, prepared_tag)
+
+                # Prepare URL for injection, URL consist of custom POST request of XML.
+                pattern_url = r'(.*/)[^/]+$'
+                prepared_url = re.sub(pattern_url, r'\1' + extracted_uri, url)
+
+                # Return the pre-build URL and the custom XML payload
+                return prepared_url, xml_payload
+            # Generic attempt to XML Injection, inject custom payload in fake tags.
+            else:
+                xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
+                                <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
+                                <bongus><bongus2>&XXE</bongus2><bongus3>&XXE</bongus3></bongus>'''.format(payload)
+                # if 'error' in str(self.session.post(url, data=xml_payload, headers={'Content-Type': 'application/xml'}).content):
+                #     return True, 'Low'
+                return None, xml_payload
+        except Exception as e:
+            Utilities.print_except_message('error', e, "Something went wrong when testing for XML Injection.", url)
+            pass
+
+    @staticmethod
+    def custom_user_agent(user_agent):
         try:
             # Create custom user-agent based on provided input
             return {'User-Agent': user_agent}
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when modifying the User-Agent.")
+            Utilities.print_except_message('error', e, "Something went wrong when modifying the User-Agent.")
             pass
 
-    def extract_injection_fields_from_form(self, form_data):
+    @staticmethod
+    def extract_injection_fields_from_form(form_data):
         try:
             keys_to_populate = []
             # Find the emtpy form values, meaning they await user input, add them to a list and return the list
@@ -292,7 +303,7 @@ class Utilities(ScanConfigParameters):
                     keys_to_populate.append(key)
             return keys_to_populate
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting the empty inputs from a form.")
+            Utilities.print_except_message('error', e, "Something went wrong when extracting the empty inputs from a form.")
             pass
 
     def extract_name_value(self, form_data):
@@ -301,14 +312,14 @@ class Utilities(ScanConfigParameters):
                 return form_data['name']
             return 0
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting name value from a form.")
+            Utilities.print_except_message('error', e, "Something went wrong when extracting name value from a form.")
             pass
 
     def extract_cookies(self):
         try:
             return self.session.cookies.get_dict()
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when saving cookies.")
+            Utilities.print_except_message('error', e, "Something went wrong when saving cookies.")
             pass
 
     def check_scan_build_url(self, url, username=None, password=None, static_scan=None, sec_level=None):
@@ -340,7 +351,7 @@ class Utilities(ScanConfigParameters):
                         self.DataStorage.urls.add(url)
             html_report.create_tree(self.link_pairs)
         except Exception as e:
-            self.print_except_message('error', e,
+            Utilities.print_except_message('error', e,
                                       "Something went wrong when checking for login requirements or scan options. Quitting..")
             quit()
 
@@ -355,17 +366,18 @@ class Utilities(ScanConfigParameters):
                 action_urls.append(str(url + '?' + str(name) + '='))
             return action_urls
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting non-form inputs", url)
+            Utilities.print_except_message('error', e, "Something went wrong when extracting non-form inputs", url)
             pass
 
-    def extract_forms_and_form_data(self, url):
+    @staticmethod
+    def extract_forms_and_form_data(url):
         try:
             form_list = []
             form_data_list = []
             # Extract forms from each URL
-            for form in self.extract_forms(url):
+            for form in Utilities.extract_forms(url):
                 # For each form extract the details needed for payload submission
-                form_data = self.extract_form_details(form)
+                form_data = Utilities.extract_form_details(form)
                 # Ignore page default forms
                 if any([True for key, value in form_data.items() if key == 'form_security_level' or key == 'form_bug']):
                     continue
@@ -373,16 +385,17 @@ class Utilities(ScanConfigParameters):
                 form_data_list.append(form_data)
             return form_list, form_data_list
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting form and form data", url)
+            Utilities.print_except_message('error', e, "Something went wrong when extracting form and form data", url)
             pass
 
-    def no_form_input_content(self, url, payload):
+    @staticmethod
+    def no_form_input_content(url, payload):
         try:
             # Extract inputs outside of form or with no method/action in form
             input_list_fin = set()
             form_data = {}
             response_list = []
-            soup = BeautifulSoup(self.session.get(url, timeout=300).content, 'html.parser')
+            soup = BeautifulSoup(ScanConfig.session.get(url, timeout=300).content, 'html.parser')
             input_list = soup.findAll('input')
             # Get all inputs that have a form parent but no action or button.
             for input in input_list:
@@ -402,7 +415,7 @@ class Utilities(ScanConfigParameters):
             # Harvest page for scripts containing path, since none can be found
             # Brute-force inputs for destination path.
             try:
-                potential_paths = re.findall(r'["\']([^"\']*\.php)["\']', self.session.get(url).text)
+                potential_paths = re.findall(r'["\']([^"\']*\.php)["\']', ScanConfig.session.get(url).text)
                 # Get the regex groups of each path of the URL: 0 is http(s), 1 is the domain, 2,3,4 etc., are the paths /
                 scheme_match = re.compile(r'^(https?:\/\/[^\/]+)').match(url)
                 base_domain = scheme_match.group(0)
@@ -418,20 +431,20 @@ class Utilities(ScanConfigParameters):
                 potential_paths = set(potential_paths)
                 for potential_path in potential_paths:
                     # Ignore the items from the ignored list
-                    if any(ignored in str(potential_path) for ignored in self.ignored_links):
+                    if any(ignored in str(potential_path) for ignored in ScanConfig.ignored_links):
                         continue
                     if '../' in potential_path:
                         # If app is browsing for the relative resource ../example.php, we need to go back the same about of paths in the current URL as we have ../ in the identified new paths
                         new_url = str(groups[-potential_path.count('../') - 1]) + "/" + potential_path.replace("../", "")
                     else:
                         new_url = url + potential_path
-                    if self.session.get(new_url).status_code == 200:
-                        response_list.append(self.session.post(new_url, params=form_data))
+                    if ScanConfig.session.get(new_url).status_code == 200:
+                        response_list.append(ScanConfig.session.post(new_url, params=form_data))
                 return response_list
             except Exception:
                 pass
         except Exception as e:
-            self.print_except_message('error', e,
+            Utilities.print_except_message('error', e,
                                       "Something went wrong when extracting inputs outside of forms or with forms with no method.",
                                       url)
             pass
@@ -448,7 +461,8 @@ class Utilities(ScanConfigParameters):
             # Ignore if input not found
             pass
 
-    def print_except_message(self, m_type, error=None, custom_message=None, url=None): #TODO: Add timestamp to errors
+    @staticmethod
+    def print_except_message(m_type, error=None, custom_message=None, url=None): #TODO: Add timestamp to errors
         try:
             if m_type == 'warning':
                 if error:
@@ -469,29 +483,30 @@ class Utilities(ScanConfigParameters):
                             custom_message) + "\nPlease check the Error file for additional details.")
                         if url:
                             print(Fore.RED + "\n[ERROR] URL:" + str(url) + "\nDetails: " + str(
-                                custom_message) + "\nError Details: " + str(error), file=self.err_file)
+                                custom_message) + "\nError Details: " + str(error), file=ScanConfig.err_file)
                         else:
                             print(Fore.RED + "\n[ERROR] " + "\nDetails: " + str(
-                                custom_message) + "\nError Details: " + str(error), file=self.err_file)
+                                custom_message) + "\nError Details: " + str(error), file=ScanConfig.err_file)
                     else:
                         print(Fore.RED + "\n[ERROR] Please check the Error file for additional details.")
                         if url:
                             print(Fore.RED + "\n[ERROR] URL:" + str(url) + "\nError Details: " + error,
-                                  file=self.err_file)
+                                  file=ScanConfig.err_file)
                         else:
-                            print(Fore.RED + "\n[ERROR] " + str(error), file=self.err_file)
+                            print(Fore.RED + "\n[ERROR] " + str(error), file=ScanConfig.err_file)
             print(Fore.RESET)
         except Exception as e:
             print(Fore.RED + "[ERROR] Something went wrong when printing to Error File.", e)
             print(Fore.RESET)
             pass
 
-    def extract_xml_tags(self, url):
+    @staticmethod
+    def extract_xml_tags(url):
         try:
             pattern_tags = r'xmlHttp\.send\("([^"]+)"\);'
             pattern_uri = r'xmlHttp\.open\("POST","([^"]+)"'
-            match_tags = re.search(pattern_tags, self.session.get(url).text, re.DOTALL)
-            match_uri = re.search(pattern_uri, self.session.get(url).text, re.DOTALL)
+            match_tags = re.search(pattern_tags, ScanConfig.session.get(url).text, re.DOTALL)
+            match_uri = re.search(pattern_uri, ScanConfig.session.get(url).text, re.DOTALL)
 
             if match_tags and match_uri:
                 extracted_xml = match_tags.group(1)
@@ -499,10 +514,11 @@ class Utilities(ScanConfigParameters):
                 return extracted_uri, extracted_xml
             return None, None
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when extracting XML tags.", url)
+            Utilities.print_except_message('error', e, "Something went wrong when extracting XML tags.", url)
             pass
 
-    def pretty_sql(self, sql_type_input):
+    @staticmethod
+    def pretty_sql(sql_type_input):
         try:
             if sql_type_input == "{'auth_sql'}":
                 return 'Authentication Bypass SQL Injection'
@@ -518,5 +534,5 @@ class Utilities(ScanConfigParameters):
                 return 'Union Select SQL Injection'
             return
         except Exception as e:
-            self.print_except_message('error', e, "Something went wrong when SQL Types.")
+            Utilities.print_except_message('error', e, "Something went wrong when SQL Types.")
             pass
