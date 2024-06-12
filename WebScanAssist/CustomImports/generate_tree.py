@@ -1,7 +1,6 @@
 # [[a,b], [b,c], [a,d], [a,g], [g,h], [b,j]]
 import json
 
-
 def generate_tree(list):
     try:
         node_dict = {}

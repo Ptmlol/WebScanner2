@@ -118,7 +118,7 @@
 <div class="container">
     <h4>External URLs:</h4>
     {% for link in non_accessible_links %}
-    <div class="item-list" href="{{ url }}">{{ link }}</div>
+    <div class="item-list">{{ link }}</div>
     {% endfor %}
 </div>
 {% endif %}
@@ -150,7 +150,7 @@
 <div class="container">
     <h4>External URLs:</h4>
     {% for link in external_links %}
-    <div class="item-list" href="{{ url }}">{{ link }}</div>
+    <div class="item-list">{{ link }}</div>
     {% endfor %}
 </div>
 {% endif %}
@@ -160,6 +160,7 @@
 </div>
 
 <script>
+    const firstPrint = true;
     function printTree(
         initialTree,
         printNode,
@@ -179,7 +180,7 @@
 
             if (typeof toPrint === 'string') {
 
-                if (toPrint !== '-1') {
+                if (toPrint !== '<a href="-1">-1</a>') {
                     const outputDiv = document.getElementById('output');
                     outputDiv.innerHTML += `${branch}${branchHead}${toPrint}\n`;
                 }
@@ -204,7 +205,7 @@
     }
 
     const tree = JSON.parse('{{tree_json}}');
-    printTree(tree, node => node.name.toUpperCase(), node => node.children,)
+    printTree(tree, node => node === 'root' ? `root` : `<a href="${node.name}">${node.name}</a>`, node => node.children,)
 
 </script>
 </body>
