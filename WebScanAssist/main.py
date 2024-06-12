@@ -545,7 +545,7 @@ class Utilities(ScanConfigParameters):
             self.print_except_message('error', e, "Something went wrong when extracting form and form data", url)
             pass
 
-    def no_form_input_content(self, url, payload): # TODO: Fix parsing to URL ex: http://192.168.116.11/dvwa/vulnerabilities/exec/../../phpinfo.php
+    def no_form_input_content(self, url, payload):
         try:
             # Extract inputs outside of form or with no method/action in form
             input_list_fin = set()
@@ -553,13 +553,16 @@ class Utilities(ScanConfigParameters):
             response_list = []
             soup = BeautifulSoup(self.session.get(url, timeout=300).content, 'html.parser')
             input_list = soup.findAll('input')
+            # Get all inputs that have a form parent but no action or button.
             for input in input_list:
                 if input.find_parent('form'):
                     parent_attr = input.find_parent('form').attrs
                     if not (('action' in parent_attr) or ('button' in parent_attr)):
                         input_list_fin.add(input)
                 else:
+                    # Get inputs with no form parent
                     input_list_fin.add(input)
+
             if input_list_fin:
                 for field in input_list_fin:
                     if field.get('name'):
@@ -568,15 +571,28 @@ class Utilities(ScanConfigParameters):
             # Harvest page for scripts containing path, since none can be found
             # Brute-force inputs for destination path.
             potential_paths = re.findall(r'["\']([^"\']*\.php)["\']', self.session.get(url).text)
-            new_temp_url = re.match('^https?:\/\/([^\/]+\/)*', url)
-            potential_paths.append(url)
+            # Get the regex groups of each path of the URL: 0 is http(s), 1 is the domain, 2,3,4 etc, are the paths /
+            scheme_match = re.compile(r'^(https?:\/\/[^\/]+)').match(url)
+            base_domain = scheme_match.group(0)
+            # Split the path into segments
+            path = url[len(base_domain):].strip('/')
+            path_segments = path.split('/')
+            # Initialize the list of groups
+            groups = [base_domain]
+            # Build the groups dynamically
+            for i in range(len(path_segments)):
+                groups.append(f"{base_domain}/{'/'.join(path_segments[:i + 1])}")
+
             potential_paths = set(potential_paths)
             for potential_path in potential_paths:
-                # Ignore commonly used words unrelated with what is needed.
-                if 'logout' in str(potential_path).lower() or 'reset' in str(potential_path).lower() or 'change' in str(
-                        potential_path).lower():
+                # Ignore the items from the ignored list
+                if any(ignored in str(potential_path) for ignored in self.ignored_links):
                     continue
-                new_url = str(new_temp_url.group()) + potential_path
+                if '../' in potential_path:
+                    # If app is browsing for the relative resource ../example.php, we need to go back the same about of paths in the current URL as we have ../ in the identified new paths
+                    new_url = str(groups[-potential_path.count('../') - 1]) + "/" + potential_path.replace("../", "")
+                else:
+                    new_url = url + potential_path
                 if self.session.get(new_url).status_code == 200:
                     response_list.append(self.session.post(new_url, params=form_data))
             return response_list
@@ -685,13 +701,13 @@ class Scanner(Utilities):
     def scan(self):
         try:
             # Scan app
-            self.scan_browser_cache()
-            self.scan_xst()
-            self.scan_hhi()
-            self.scan_http()
-            self.scan_hsts()
-            self.scan_ria()
-            self.scan_robotstxt()
+            # self.scan_browser_cache()
+            # self.scan_xst()
+            # self.scan_hhi()
+            # self.scan_http()
+            # self.scan_hsts()
+            # self.scan_ria()
+            # self.scan_robotstxt()
 
             # Scan harvested URLs
             for url in self.DataStorage.urls:
@@ -977,7 +993,7 @@ class Scanner(Utilities):
     def t_i_code_exec(self, url, form, form_data):
         try:
             # Detects blind and standard Code Exec (Ping for 3 seconds)
-            code_exec_payload = "|ping -c 7 127.0.0.1" # 8.8.8.8|cat /etc/passwd # TODO :Find DVWA PAyload for HIGH
+            code_exec_payload = "|ping -c 7 127.0.0.1" # 8.8.8.8|cat /etc/passwd
             # Get injection points and inject the payload.
             injection_keys = self.extract_injection_fields_from_form(form_data)
             for injection_key in injection_keys:
@@ -1064,18 +1080,20 @@ class Scanner(Utilities):
                                       url)
             pass
 
-    def t_i_ssi(self, url, form, form_data): # TODO: Check if accurate
+    def t_i_ssi(self, url, form, form_data):
         try:
             # Non-blind detection. Search for UNIX time format in response.
-            ssi_payload = '<!--#exec cmd=uptime -->'
+            ssi_payload = '<!--#exec cmd=netstat -->'
             # Inject only injectable fields
             injection_keys = self.extract_injection_fields_from_form(form_data)
             for injection_key in injection_keys:
                 form_data[injection_key] = ssi_payload
             response = self.submit_form(url, form, form_data)
             if not response:
-                return 0
-            return re.findall('\d\d:\d\d:\d\d', str(response.text))
+                return False
+            if 'active internet connections' in str(response.text).lower():
+                return True
+            return False
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for SSI (Server-Side Includes).",
                                       url)
@@ -1084,12 +1102,12 @@ class Scanner(Utilities):
     def t_i_ssi_nfi(self, url):
         try:
             # Non-blind detection. Search for UNIX time format in response.
-            ssi_payload = '<!--#exec cmd=uptime -->'
+            ssi_payload = '<!--#exec cmd=netstat -->'
             response_injected = self.no_form_input_content(url, ssi_payload)
             if not response_injected:
-                return 0
+                return False
             for response_inj in response_injected:
-                if re.findall('\d\d:\d\d:\d\d', str(response_inj.text)):
+                if 'active internet connections' in str(response_inj.text).lower():
                     return True
             return False
         except Exception as e:
