@@ -1,11 +1,6 @@
+import copy
 import html
-import platform
 import random
-import ssl
-import sys
-import time
-from io import UnsupportedOperation
-import json
 from colorama import Fore
 import requests
 import urllib.parse
@@ -17,182 +12,13 @@ import argparse
 import os
 from CustomImports import html_report
 from Config import config
-# import queue
-# import socket
-# import ssl
-# from datetime import datetime
-
-# from tkinter import *
-# from tkinter.ttk import *
-# from tkinter.font import *
-# import threading
-# import ctypes
-# import sys
 import re
-import http.cookies
 
-# import subprocess
-# import shutil
-# import webbrowser
 
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 firstCallSpider = 1
 
-
-#
-# class LoginTests:
-#     def __init__(self, user, login_url, pass_file, wrong_username, good_password, certain_wrong_passwd, logout_url, file_for_report, error_file):
-#         try:
-#             self.error_file = error_file
-#             self.report_file = file_for_report
-#             self.username = user
-#             self.password_found = False
-#             self.login_url = login_url
-#             self.logged_in = False
-#             self.pass_file = pass_file
-#             self.password = None
-#             self.wrong_un = wrong_username
-#             self.wrong_passwords = certain_wrong_passwd
-#             self.credentials_error_vuln = False
-#             self.good_password = good_password
-#             self.session = requests.session()
-#             self.logout_url = logout_url
-#
-#             self.test_lockout()
-#             self.test_account_enum()
-#             self.test_brute_force()
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when initializing login tests. Error: ", e, file=self.error_file)
-#             pass
-#
-#     def brute_force(self):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Trying BruteForcing Login")
-#             except Exception:
-#                 pass
-#             with open(config_object["FILE"]["password_dict"], "rb") as f:
-#                 pass_list = f.readlines()
-#                 f.close()
-#             pass_q = queue.Queue()
-#             if len(pass_list):
-#                 for passwd in pass_list:
-#                     try:
-#                         passwd = passwd.decode("utf-8").rstrip()
-#                         pass_q.put(passwd)
-#                     except Exception as e:
-#                         print(e)
-#                         passwd = passwd.decode("latin-1").rstrip()
-#                         pass_q.put(passwd)
-#
-#             for pass_word in pass_q.queue:
-#                 http = requests.post(
-#                     self.login_url,
-#                     data={
-#                         config_object["CREDENTIAL"]["username_field"]: self.username,
-#                         config_object["CREDENTIAL"]["password_field"]: pass_word,
-#                         config_object["CREDENTIAL"]["login_field"]: config_object["CREDENTIAL"]["submit_field"]
-#                     }
-#                 )
-#                 if http.url == config_object["WEBURL"]["index"]:
-#                     self.password = pass_word
-#                     self.password_found = True
-#                     return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when trying brute force tests. Error: ", e, file=self.error_file)
-#             print("[Error Info] Login LINK:", self.login_url, file=self.error_file)
-#             pass
-#
-#     def account_enumeration(self):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Trying to enumerate accounts")
-#             except Exception:
-#                 pass
-#             print("Checking for Account Enumeration and Possible Guessable Users...", file=self.report_file)
-#             wrong_password_res = requests.post(
-#                 self.login_url,
-#                 data={
-#                     config_object["CREDENTIAL"]["username_field"]: self.username,
-#                     config_object["CREDENTIAL"]["password_field"]: self.wrong_passwords,
-#                     config_object["CREDENTIAL"]["login_field"]: config_object["CREDENTIAL"]["submit_field"]
-#                 }
-#             )
-#             wrong_password_res_content = str(wrong_password_res.content)
-#             wrong_username_res = requests.post(
-#                 self.login_url,
-#                 data={
-#                     config_object["CREDENTIAL"]["username_field"]: self.wrong_un,
-#                     config_object["CREDENTIAL"]["password_field"]: self.good_password,
-#                     config_object["CREDENTIAL"]["login_field"]: config_object["CREDENTIAL"]["submit_field"]
-#                 }
-#             )
-#             wrong_username_req_content = str(wrong_username_res.content)
-#             if wrong_username_req_content != wrong_password_res_content:
-#                 return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking for account enumeration. Error: ", e, file=self.error_file)
-#             print("[Error Info] Login LINK:", self.login_url, file=self.error_file)
-#             pass
-#
-#     def get_correct_password(self):
-#         try:
-#             if self.password_found:
-#                 return self.password
-#             return False
-#         except Exception:
-#             pass
-#
-#     def check_login_attempts(self, n):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Checking Lock-Out Mechanism")
-#             except Exception:
-#                 pass
-#             self.session = requests.session()
-#             for i in range(n):
-#                 self.session.post(
-#                     self.login_url,
-#                     data={
-#                         config_object["CREDENTIAL"]["username_field"]: self.username,
-#                         config_object["CREDENTIAL"]["password_field"]: self.wrong_passwords[0],
-#                         config_object["CREDENTIAL"]["login_field"]: config_object["CREDENTIAL"]["submit_field"]
-#                     }
-#                 )
-#             correct_login = self.session.post(
-#                 self.login_url,
-#                 data={
-#                     config_object["CREDENTIAL"]["username_field"]: self.username,
-#                     config_object["CREDENTIAL"]["password_field"]: self.good_password,
-#                     config_object["CREDENTIAL"]["login_field"]: config_object["CREDENTIAL"]["submit_field"]
-#                 }
-#             )
-#             if correct_login.url == config_object["WEBURL"]["index"]:
-#                 self.session.post(self.logout_url)
-#                 self.session.close()
-#                 print("[!!!-!!!] Wrong Password Lock Out Mechanism not triggered after ", n, " times", file=self.report_file)
-#                 return 1
-#             return 0
-#         except Exception as e:
-#             print("\n[ERROR] Something went wrong when checking for wrong pw lock-out. Error: ", e, file=self.error_file)
-#             print("[Error Info] Login LINK:", self.login_url, file=self.error_file)
-#             pass
-#
-#     def test_lockout(self):
-#         try:
-#             try:
-#                 my_gui.update_list_gui("Testing Lock-Out Mechanism")
-#             except Exception:
-#                 pass
-#             if self.check_login_attempts(int(config_object["TEST"]["lock_out_mechanism_attempts"])):
-#                 print("[!!!-!!!] Weak Lockout Mechanism found for a number of invalid password attempts", file=self.report_file)
-#             else:
-#                 print("OK! Wrong Password Lock Out Mechanism detected", file=self.report_file)
-#             return
-#         except Exception:
-#             pass
+# DVWA : https://github.com/digininja/DVWA
 
 
 class DataStorage:
@@ -499,7 +325,7 @@ class Utilities(ScanConfigParameters):
             input_fields = form.find_all('input')
             for field in input_fields:
                 if field.get('name'):
-                    if str(field.get('name')).lower() == 'submit':
+                    if (str(field.get('name')).lower() == 'submit') or (str(field.get('type')).lower() == 'submit') or (str(field.get('name')).lower() == 'user_token'):
                         form_data[field.get('name')] = field.get('value')
                         continue
                     form_data[field.get('name')] = ''  # might need back field.get('value', '')
@@ -512,7 +338,10 @@ class Utilities(ScanConfigParameters):
             form_fields = form.find_all('button')
             for field in form_fields:
                 if field.get('name'):
-                    form_data[field.get('name')] = field.get('value', 'submit')
+                    if (str(field.get('name')).lower() == 'submit') or (str(field.get('type')).lower() == 'submit') or (str(field.get('name')).lower() == 'user_token'):
+                        form_data[field.get('name')] = field.get('value')
+                        continue
+                    form_data[field.get('name')] = '' # field.get('value', 'submit')
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
@@ -591,11 +420,13 @@ class Utilities(ScanConfigParameters):
             else:
                 return 0
             # Check if action is URL or if it is path relative to URL.
-            if action.startswith('http'):
-                action_url = action
+            if action:
+                if action.startswith('http'):
+                    action_url = action
+                else:
+                    action_url = urllib.parse.urljoin(url, action)
             else:
-                action_url = urllib.parse.urljoin(url, action)
-
+                action_url = url
             # Send data accordingly to method.
             if method == 'GET':
                 response = self.session.get(action_url, params=form_data, timeout=10)
@@ -604,8 +435,8 @@ class Utilities(ScanConfigParameters):
             response.raise_for_status()
             return response
         except requests.HTTPError as e:
-            self.print_except_message('error', e, "Something went wrong when submitting a form. A HTTP error occurred",
-                                      url)
+            # pass as the application is unable to handle the error
+            # self.print_except_message('error', e, "Something went wrong when submitting a form. A HTTP error occurred", url)
             pass
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when submitting a form.", url)
@@ -714,7 +545,7 @@ class Utilities(ScanConfigParameters):
             self.print_except_message('error', e, "Something went wrong when extracting form and form data", url)
             pass
 
-    def no_form_input_content(self, url, payload):
+    def no_form_input_content(self, url, payload): # TODO: Fix parsing to URL ex: http://192.168.116.11/dvwa/vulnerabilities/exec/../../phpinfo.php
         try:
             # Extract inputs outside of form or with no method/action in form
             input_list_fin = set()
@@ -739,6 +570,7 @@ class Utilities(ScanConfigParameters):
             potential_paths = re.findall(r'["\']([^"\']*\.php)["\']', self.session.get(url).text)
             new_temp_url = re.match('^https?:\/\/([^\/]+\/)*', url)
             potential_paths.append(url)
+            potential_paths = set(potential_paths)
             for potential_path in potential_paths:
                 # Ignore commonly used words unrelated with what is needed.
                 if 'logout' in str(potential_path).lower() or 'reset' in str(potential_path).lower() or 'change' in str(
@@ -853,20 +685,20 @@ class Scanner(Utilities):
     def scan(self):
         try:
             # Scan app
-            self.scan_browser_cache()
-            print('scan_browser_cache')
-            self.scan_xst()
-            print('scan_xst')
-            self.scan_hhi()
-            print('scan_hhi')
-            self.scan_http()
-            print('scan_http')
-            self.scan_hsts()
-            print('scan_hsts')
-            self.scan_ria()
-            print('scan_ria')
-            self.scan_robotstxt()
-            print('scan_robotstxt')
+            # self.scan_browser_cache()
+            # print('scan_browser_cache')
+            # self.scan_xst()
+            # print('scan_xst')
+            # self.scan_hhi()
+            # print('scan_hhi')
+            # self.scan_http()
+            # print('scan_http')
+            # self.scan_hsts()
+            # print('scan_hsts')
+            # self.scan_ria()
+            # print('scan_ria')
+            # self.scan_robotstxt()
+            # print('scan_robotstxt')
 
             # Scan harvested URLs
             # print(self.DataStorage.urls)
@@ -874,7 +706,7 @@ class Scanner(Utilities):
                 print(url)
                 # # Form and URL scan
                 #
-                #self.scan_html(url)
+                #self.scan_html(url) # Check why so slow
                 print('scan_html')
                 self.scan_iframe(url)
                 print('scan_iframe')
@@ -945,26 +777,25 @@ class Scanner(Utilities):
                 for injection_key in injection_keys:
                     form_data[injection_key] = sql_payload
                 # Check time based only once, heavy load on time of execution.
-                if time_based and self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
+                if (time_based and confidence > 2) and self.DataStorage.inject_type(sql_payload) == 'time_based_sql':
                     continue
                 response_injected = self.submit_form(url, form, form_data)
                 if not response_injected:
-                    return 0, 0, 0
+                    continue
                 payload_response_time = response_injected.elapsed.total_seconds()
                 # Get time of response and check.
-                if payload_response_time > avg_response_time and payload_response_time > 2 and time_based is False:
+                if payload_response_time > avg_response_time and payload_response_time > 2:  # and (time_based is False or confidence < 2):
                     # Vulnerable to Time based SQL type X, increase confidence
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
                     time_based = True
-                    continue
 
                 if "error" in response_injected.text.lower():
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
                 # Check if comprehensive scan is required, if not, jump out on 3 vulnerabilities hit, for time management.
 
-                if self.comprehensive_scan is False and confidence > 0:
+                if self.comprehensive_scan is False and confidence > 1:
                     return True, sql_type_list, confidence
                 # Check if vulnerability is found or not, if comprehensive is required.
                 elif self.comprehensive_scan is True and sql_payload == self.DataStorage.payloads("SQL")[
@@ -1259,7 +1090,7 @@ class Scanner(Utilities):
                                       url)
             pass
 
-    def t_i_ssi(self, url, form, form_data):
+    def t_i_ssi(self, url, form, form_data): # TODO: Check if accurate
         try:
             # Non-blind detection. Search for UNIX time format in response.
             ssi_payload = '<!--#exec cmd=uptime -->'
@@ -1509,8 +1340,9 @@ class Scanner(Utilities):
                     form_data[injection_key] = xss_payload
                 response_injected = self.submit_form(url, form, form_data)
                 if not response_injected:
-                    return False, 0
-                if (xss_payload.lower() in response_injected.text.lower()) or xss_payload.lower() in html.unescape(response_injected.text.lower()):
+                    continue
+                # TODO :Figure why payload is not in response when it is
+                if (str(xss_payload).lower() in str(response_injected.text).lower()) or (str(xss_payload).lower() in str(html.unescape(response_injected.text.lower()))):
                     confidence += 1
                 if self.comprehensive_scan is False and confidence > 0:
                     return True, confidence
@@ -1745,9 +1577,10 @@ class Scanner(Utilities):
 
     def t_i_lfi(self, url):
         try:
-            lfi_script = '/../../../etc/passwd' # TODO: Find for DVWA HIGH
+            # for html_payload in self.DataStorage.payloads("HTML"): #TODO: Add more payloads LFI/RFI
+            lfi_script = '/../../../etc/passwd'
             if '=' in url:
-                url = url.replace("=", "=" + lfi_script)
+                url = re.sub(r'=(?!.*=).*$', f'={lfi_script}', url)
                 if "root:" in self.session.get(url).text.lower():
                     return True
             form_list, form_data_list = self.extract_forms_and_form_data(url)
@@ -1783,6 +1616,7 @@ class Scanner(Utilities):
                 return js_payload in str(self.session.get(new_url).text).lower()
             else:
                 new_url = url + js_payload[1:]
+                print(new_url)
                 return js_payload[1:] in str(self.session.get(new_url).text).lower()
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
