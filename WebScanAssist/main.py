@@ -685,61 +685,35 @@ class Scanner(Utilities):
     def scan(self):
         try:
             # Scan app
-            # self.scan_browser_cache()
-            # print('scan_browser_cache')
-            # self.scan_xst()
-            # print('scan_xst')
-            # self.scan_hhi()
-            # print('scan_hhi')
-            # self.scan_http()
-            # print('scan_http')
-            # self.scan_hsts()
-            # print('scan_hsts')
-            # self.scan_ria()
-            # print('scan_ria')
-            # self.scan_robotstxt()
-            # print('scan_robotstxt')
+            self.scan_browser_cache()
+            self.scan_xst()
+            self.scan_hhi()
+            self.scan_http()
+            self.scan_hsts()
+            self.scan_ria()
+            self.scan_robotstxt()
 
             # Scan harvested URLs
-            # print(self.DataStorage.urls)
             for url in self.DataStorage.urls:
-                print(url)
                 # # Form and URL scan
                 #
                 #self.scan_html(url) # Check why so slow
-                print('scan_html')
                 self.scan_iframe(url)
-                print('scan_iframe')
                 self.scan_code_exec(url)
-                print('scan_code_exec')
                 self.scan_php_exec(url)
-                print('scan_php_exec')
                 self.scan_ssi(url)
-                print('scan_ssi')
                 self.scan_sql(url)
-                print('scan_sql')
                 self.scan_role_def_dir(url)
-                print('scan_role_def_dir')
                 self.scan_role_def_cookie(url)
-                print('scan_role_def_cookie')
                 # self.scan_session(url) # TODO : Fix Strong Sessions
-                #print('scan_session')
                 self.scan_xss(url)
-                print('scan_xss')
                 self.scan_idor(url)
-                print('scan_idor')
                 self.scan_cors(url)
-                print('scan_cors')
                 self.scan_ssrf(url)
-                print('scan_ssrf')
                 self.scan_xml_generic(url)
-                print('scan_xml_generic')
                 self.scan_lfi(url)
-                print('scan_lfi')
                 self.scan_js(url)
-                print('scan_js')
                 self.scan_comments(url)
-                print('scan_comments')
 
             html_report.write_html_report()  # TODO: Prettify report
             return
