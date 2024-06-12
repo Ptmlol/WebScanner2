@@ -1,4 +1,3 @@
-import copy
 import html
 import random
 from colorama import Fore
@@ -139,6 +138,9 @@ class ScanConfigParameters:
             self.link_pairs = []
             # Setup initial requirements and prepare files.
             self.setup()
+            # Initialize the ignored links and errors file parameters
+            self.ignored_links = None
+            self.err_file = None
         except Exception:
             print(Fore.RED + "\n[ERROR] Something went wrong during initialization. Quitting..\n")
             print(Fore.RESET)
@@ -206,7 +208,7 @@ class Utilities(ScanConfigParameters):
 
     def extract_do_login(self, url, username, password, sec_level=None):
         try:
-            # Treat login form as an usual form, extract it.
+            # Treat login form as usual form, extract it.
             login_form = self.extract_forms(url)
             for l_form in login_form:
                 # Extract form details and check where data needs to be populated, position one generally username,
@@ -434,7 +436,7 @@ class Utilities(ScanConfigParameters):
                 response = self.session.post(action_url, data=form_data, timeout=10)
             response.raise_for_status()
             return response
-        except requests.HTTPError as e:
+        except requests.HTTPError:
             # pass as the application is unable to handle the error
             # self.print_except_message('error', e, "Something went wrong when submitting a form. A HTTP error occurred", url)
             pass
@@ -571,7 +573,7 @@ class Utilities(ScanConfigParameters):
             # Harvest page for scripts containing path, since none can be found
             # Brute-force inputs for destination path.
             potential_paths = re.findall(r'["\']([^"\']*\.php)["\']', self.session.get(url).text)
-            # Get the regex groups of each path of the URL: 0 is http(s), 1 is the domain, 2,3,4 etc, are the paths /
+            # Get the regex groups of each path of the URL: 0 is http(s), 1 is the domain, 2,3,4 etc., are the paths /
             scheme_match = re.compile(r'^(https?:\/\/[^\/]+)').match(url)
             base_domain = scheme_match.group(0)
             # Split the path into segments
@@ -610,11 +612,11 @@ class Utilities(ScanConfigParameters):
                     if input['type'] == 'hidden':
                         return True
             return False
-        except Exception as e:
+        except Exception:
             # Ignore if input not found
             pass
 
-    def print_except_message(self, m_type, error=None, custom_message=None, url=None):
+    def print_except_message(self, m_type, error=None, custom_message=None, url=None): #TODO: Add timestamp to errors
         try:
             if m_type == 'warning':
                 if error:
@@ -780,7 +782,7 @@ class Scanner(Utilities):
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
                     time_based = True
 
-                if "error" in response_injected.text.lower():
+                if "error" in response_injected.text.lower(): # TODO: Fix generic FP rate for 'error' alone in response.
                     confidence += 1
                     sql_type_list.add(self.DataStorage.inject_type(sql_payload))
                 # Check if comprehensive scan is required, if not, jump out on 3 vulnerabilities hit, for time management.
@@ -899,7 +901,8 @@ class Scanner(Utilities):
             self.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)
             pass
 
-    def t_i_html(self, url, form, form_data):
+    def t_i_html(self, url, form, form_data): # TODO: Remove comprehensive tag
+        # TODO: Think of a method for adding confidence dynamically
         try:
             # Select injection points from form details
             confidence = 0
@@ -1142,7 +1145,7 @@ class Scanner(Utilities):
             if extracted_uri and extracted_tag:
                 # Get the first content of the first identified tag and inject it with the custom XXE variable
                 prepared_tag =  re.sub(r'(<[^>]+>)([^<]+)(</[^>]+>)', r'\1' + '&XXE;' + r'\3', extracted_tag, count=1)
-                # Prepare the payload with with specific requirements such as identified tags.
+                # Prepare the payload with specific requirements such as identified tags.
                 xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
                 <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
                 {}'''.format(payload, prepared_tag)
@@ -1151,7 +1154,7 @@ class Scanner(Utilities):
                 pattern_url = r'(.*/)[^/]+$'
                 prepared_url = re.sub(pattern_url, r'\1' + extracted_uri, url)
 
-                # Return the pre build URL and the custom XML payload
+                # Return the pre-build URL and the custom XML payload
                 return prepared_url, xml_payload
             # Generic attempt to XML Injection, inject custom payload in fake tags.
             else:
@@ -1460,7 +1463,7 @@ class Scanner(Utilities):
                 if self.session.get(url).headers['Access-Control-Allow-Origin'] == '*':
                     return True
                 return
-        except Exception as e:
+        except Exception:
             # Blank by design.
             pass
 
@@ -1542,15 +1545,16 @@ class Scanner(Utilities):
 
     def t_i_ssrf(self, url):  # TODO: Add more payloads
         try:
-            ssrf_payload = "=https://www.google.com/"
-            url = url.replace('=', ssrf_payload)
-            response = self.session.get(url)
-            if ssrf_payload in url and response.status_code == 200:
-                return True
-            ssrf_payload = '=file:///etc/passwd'
-            url = url.replace('=', ssrf_payload)
-            if ssrf_payload in url and "root:" in response.text.lower():
-                return True
+            if '=' in url:
+                ssrf_payload = "=https://www.google.com/"
+                url = url.replace('=', ssrf_payload)
+                response = self.session.get(url)
+                if ssrf_payload in url and response.status_code == 200:
+                    return True
+                ssrf_payload = '=file:///etc/passwd'
+                url = url.replace('=', ssrf_payload)
+                if ssrf_payload in url and "root:" in response.text.lower():
+                    return True
             return False
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)

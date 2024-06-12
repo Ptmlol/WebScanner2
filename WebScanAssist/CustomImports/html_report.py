@@ -11,7 +11,7 @@ non_accessible_links = set()
 comments_dict = {}
 
 try:
-    def add_vulnerability(v_type, details, confidence='Critical'):
+    def add_vulnerability(v_type, details, confidence='Critical'): # TODO: Add timestamp to identified vulnerabilities
         temp_dict = {'type': v_type, 'details': details, 'severity': confidence}
         vulnerabilities.append(temp_dict)
         return
