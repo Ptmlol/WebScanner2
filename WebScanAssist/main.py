@@ -1616,7 +1616,6 @@ class Scanner(Utilities):
                 return js_payload in str(self.session.get(new_url).text).lower()
             else:
                 new_url = url + js_payload[1:]
-                print(new_url)
                 return js_payload[1:] in str(self.session.get(new_url).text).lower()
         except Exception as e:
             self.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)

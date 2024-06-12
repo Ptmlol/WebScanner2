@@ -118,7 +118,7 @@
 <div class="container">
     <h4>External URLs:</h4>
     {% for link in non_accessible_links %}
-    <div class="item-list">{{ link }}</div>
+    <div class="item-list" href="{{ url }}">{{ link }}</div>
     {% endfor %}
 </div>
 {% endif %}
@@ -150,7 +150,7 @@
 <div class="container">
     <h4>External URLs:</h4>
     {% for link in external_links %}
-    <div class="item-list">{{ link }}</div>
+    <div class="item-list" href="{{ url }}">{{ link }}</div>
     {% endfor %}
 </div>
 {% endif %}
@@ -182,7 +182,6 @@
                 if (toPrint !== '-1') {
                     const outputDiv = document.getElementById('output');
                     outputDiv.innerHTML += `${branch}${branchHead}${toPrint}\n`;
-                    console.log(`${branch}${branchHead}${toPrint}`);
                 }
             }
 
