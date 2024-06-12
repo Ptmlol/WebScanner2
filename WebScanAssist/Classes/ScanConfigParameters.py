@@ -1,8 +1,10 @@
 import os
 
 import requests
-from WebScanAssist.Config import config
 from colorama import Fore
+
+from Classes.DataStorage import DataStorage
+from Config import config
 
 
 class ScanConfigParameters:
