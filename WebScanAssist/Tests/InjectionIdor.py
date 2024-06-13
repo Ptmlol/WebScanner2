@@ -17,21 +17,37 @@ def t_idor(url, form_data):
         pass
 
 
+def get_last_query_string(url):
+    # Regular expression to capture everything after the last '?'
+    match = re.search(r'[^?]*$', url)
+    if match:
+        return match.group(0)
+    return None
+
 def t_idor_nfi(url):
     try:
         attempts = 0
-        sub_string = re.findall('[?](.*)[=]*\d', url)
-        if sub_string:
-            index_from_url = int(str(re.findall('\d', str(sub_string))))
+        #sub_string = re.findall('[?](.*)[=]*\d', url)
+        #sub_string_list = re.findall(r'\?(.*)', url)
+        sub_string = get_last_query_string(url) # query=test&value=123&other=45   --> query=test&value=
+        if not sub_string:
+            return
+        original_sub_string = sub_string
+        int_groups = re.findall(r'=(\d+)', str(sub_string))
+        for grp in int_groups:
+            index_from_url = int(str(grp)) # 123
+            sub_string = sub_string.replace(str(index_from_url), str(index_from_url + 5)) # arbitrary number to reduce FP
             response = ScanConfig.session.get(url)
             while attempts < 10:
                 try:
-                    url.replace(str(index_from_url), index_from_url + 1)
+                    url = url.replace(original_sub_string, sub_string)
                     response_2 = ScanConfig.session.get(url)
-                    if response != response_2 and str(response_2.status_code).startswith("2"):
+                    if response.text != response_2.text and str(response_2.status_code).startswith("2"):
                         return True
                 except Exception:
-                    index_from_url += 1
+                    index_from_url += 3
+                    original_sub_string = sub_string
+                    sub_string = sub_string.replace(str(index_from_url), str(index_from_url + 1))
                     attempts += 1
         return False
     except Exception as e:

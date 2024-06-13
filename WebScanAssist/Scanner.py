@@ -97,8 +97,6 @@ class Scanner(Utilities):
             quit()
 
 # Problem URLs:
-#  http://192.168.116.11/dvwa/vulnerabilities/open_redirect/source/medium.php?redirect=info.php?id=1 - IDOR
-#  http://192.168.116.11/dvwa/vulnerabilities/open_redirect/source/medium.php?redirect=info.php?id=1 - IDOR
 #  http://192.168.116.11/dvwa/docs/DVWA_v1.3.pdf
 #  http://192.168.116.11/dvwa/vulnerabilities/sqli_blind/
 #  http://192.168.116.11/dvwa/vulnerabilities/fi/?page=file3.php

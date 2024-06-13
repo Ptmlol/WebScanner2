@@ -58,10 +58,10 @@ class ScanConfig:
 
         try:  # Create Error file
             # Try to read an exiting error file, create one is none is found.
-            err_file = open('err_file.log', 'a')
+            ScanConfig.err_file = open('err_file.log', 'a')
             # Check if file is empty before writing.
             if os.stat('err_file.log').st_size == 0:
-                err_file.write("Error File\n")
+                ScanConfig.err_file.write("Error File\n")
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong when opening the Error File. Quitting..\n")
             print(Fore.RESET)
@@ -69,7 +69,7 @@ class ScanConfig:
             quit()
 
         try:  # Import Ignored URLs from Config file.
-            self.ignored_links = self.config_params['URLS']['ignored'].split(",")
+            ScanConfig.ignored_links = self.config_params['URLS']['ignored'].split(",")
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong when opening the Ignored Links file. Quitting..\n")
             print(Fore.RESET)
