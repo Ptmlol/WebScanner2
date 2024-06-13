@@ -96,13 +96,6 @@ class Scanner(Utilities):
                                       "Something went wrong when attempting to initialize scan function. Quitting..")
             quit()
 
-# Problem URLs:
-#  http://192.168.116.11/dvwa/docs/DVWA_v1.3.pdf
-#  http://192.168.116.11/dvwa/vulnerabilities/sqli_blind/
-#  http://192.168.116.11/dvwa/vulnerabilities/fi/?page=file3.php
-#  http://192.168.116.11/dvwa/vulnerabilities/fi/?page=file1.php
-#  http://192.168.116.11/dvwa/vulnerabilities/fi/?page=file2.php
-#  http://192.168.116.11/dvwa/vulnerabilities/sqli/
 
 # class CreateUserSession(Utilities):  # TODO: Create another py module for the new user.
 #     try:

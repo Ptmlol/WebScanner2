@@ -26,6 +26,8 @@ def t_i_sql(url, form, form_data):
 
         # Find the injection points for the SQL Payload
         injection_keys = Utilities.extract_injection_fields_from_form(form_data)
+        if not injection_keys:
+            return 0, 0, 0
         for sql_payload in DataStorage.payloads("SQL"):
             # Populate injection keys with payloads.
             for injection_key in injection_keys:
@@ -133,6 +135,8 @@ def run(url):
     try:
         # Scan inputs in form
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
+        if not (form_list or form_data_list):
+            return
         for index, form in enumerate(form_list):
             # Test SQL Injections and print results
             sql_vuln, sql_type, sql_conf = t_i_sql(url, form, form_data_list[index])

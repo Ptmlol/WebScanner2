@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime
 
 from jinja2 import Environment, FileSystemLoader
 from CustomImports import generate_tree
@@ -11,7 +12,7 @@ non_accessible_links = set()
 comments_dict = {}
 
 try:
-    def add_vulnerability(v_type, details, confidence='Critical'): # TODO: Add timestamp to identified vulnerabilities
+    def add_vulnerability(v_type, details, confidence='Critical'):
         temp_dict = {'type': v_type, 'details': details, 'severity': confidence}
         vulnerabilities.append(temp_dict)
         return
@@ -52,7 +53,7 @@ try:
             output = template.render(vulnerabilities=vulnerabilities, tree_json=tree_json, external_links=external_links,
                                      non_accessible_links=non_accessible_links, comments_dict=comments_dict)
             # Save the output to a file
-            with open('vulnerability_report.html', 'w', encoding='utf-8') as f:
+            with open(datetime.now().strftime('%Y-%m-%d_%H-%M') + '-report.html', 'w', encoding='utf-8') as f:
                 f.write(output)
 
             f.close()

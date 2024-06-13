@@ -162,3 +162,4 @@ cython_debug/
 # Custom Python Script
 WebScanAssist/test.py
 WebScanAssist/linkignore.log
+*.html

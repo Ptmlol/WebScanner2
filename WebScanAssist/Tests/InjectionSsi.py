@@ -43,6 +43,8 @@ def t_i_ssi_nfi(url):
 def run(url):
     try:
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
+        if not (form_list or form_data_list):
+            return
         for index, form in enumerate(form_list):
             if t_i_ssi(url, form, form_data_list[index]):
                 html_report.add_vulnerability('SSI Code Execution Injection',

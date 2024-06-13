@@ -70,6 +70,8 @@ def t_ua_xss(url):
 def run(url):
     try:
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
+        if not (form_list or form_data_list):
+            return
         for index, form in enumerate(form_list):
             xss_vuln, confidence = t_i_xss(url, form, form_data_list[index])
             if xss_vuln:

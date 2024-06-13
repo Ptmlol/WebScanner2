@@ -1,3 +1,7 @@
+from datetime import datetime
+
+from werkzeug.exceptions import InternalServerError
+
 from Classes.ScanConfig import ScanConfig
 from bs4 import BeautifulSoup
 from bs4 import MarkupResemblesLocatorWarning
@@ -138,11 +142,14 @@ class Utilities(ScanConfig):
     def extract_forms(url):
         try:
             # Extract all forms from an URL.
-            response = ScanConfig.session.get(url, timeout=300)
+
+            response = ScanConfig.session.get(url, timeout=10)
             response.raise_for_status()
             parsed_html = BeautifulSoup(response.content, "html.parser")
             return parsed_html.findAll("form")
         except requests.HTTPError as e:
+            if e.response.status_code == 500:
+                return None
             Utilities.print_except_message('error', e,
                                       "Something went wrong when extracting forms from links. A HTTP error occurred.",
                                       url)
@@ -378,7 +385,10 @@ class Utilities(ScanConfig):
             form_list = []
             form_data_list = []
             # Extract forms from each URL
-            for form in Utilities.extract_forms(url):
+            forms = Utilities.extract_forms(url)
+            if not forms:
+                return None, None
+            for form in forms:
                 # For each form extract the details needed for payload submission
                 form_data = Utilities.extract_form_details(form)
                 # Ignore page default forms
@@ -466,38 +476,38 @@ class Utilities(ScanConfig):
             pass
 
     @staticmethod
-    def print_except_message(m_type, error=None, custom_message=None, url=None): #TODO: Add timestamp to errors
+    def print_except_message(m_type, error=None, custom_message=None, url=None):
         try:
             if m_type == 'warning':
                 if error:
                     if custom_message:
-                        print(Fore.LIGHTRED_EX + "\n[WARNING] " + custom_message)
+                        print(Fore.LIGHTRED_EX + "\n[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- [WARNING] " + custom_message)
                         print(Fore.RESET)
                         print(error)
                     else:
-                        print(Fore.LIGHTRED_EX + "\n[WARNING] " + error)
+                        print(Fore.LIGHTRED_EX + "\n[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- [WARNING] " + error)
                 else:
                     if custom_message:
-                        print(Fore.LIGHTRED_EX + "\n[WARNING] " + custom_message)
+                        print(Fore.LIGHTRED_EX + "\n[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- [WARNING] " + custom_message)
 
             if m_type == 'error':
                 if error:
                     if custom_message:
-                        print(Fore.RED + "\n[ERROR] " + str(
+                        print(Fore.RED + "\n[ERROR]-[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- " + str(
                             custom_message) + "\nPlease check the Error file for additional details.")
                         if url:
-                            print(Fore.RED + "\n[ERROR] URL:" + str(url) + "\nDetails: " + str(
+                            print(Fore.RED + "\n[ERROR]-[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- URL:" + str(url) + "\nDetails: " + str(
                                 custom_message) + "\nError Details: " + str(error), file=ScanConfig.err_file)
                         else:
-                            print(Fore.RED + "\n[ERROR] " + "\nDetails: " + str(
+                            print(Fore.RED + "\n[ERROR]-[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- " + "\nDetails: " + str(
                                 custom_message) + "\nError Details: " + str(error), file=ScanConfig.err_file)
                     else:
-                        print(Fore.RED + "\n[ERROR] Please check the Error file for additional details.")
+                        print(Fore.RED + "\n[ERROR]-[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- Please check the Error file for additional details.")
                         if url:
-                            print(Fore.RED + "\n[ERROR] URL:" + str(url) + "\nError Details: " + error,
+                            print(Fore.RED + "\n[ERROR]-[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- URL:" + str(url) + "\nError Details: " + error,
                                   file=ScanConfig.err_file)
                         else:
-                            print(Fore.RED + "\n[ERROR] " + str(error), file=ScanConfig.err_file)
+                            print(Fore.RED + "\n[ERROR]-[" + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "] -- " + str(error), file=ScanConfig.err_file)
             print(Fore.RESET)
         except Exception as e:
             print(Fore.RED + "[ERROR] Something went wrong when printing to Error File.", e)

