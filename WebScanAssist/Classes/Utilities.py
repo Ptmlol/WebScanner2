@@ -125,10 +125,11 @@ class Utilities(ScanConfig):
             Utilities.print_except_message('error', e, "Something went wrong when crawling for links.", url)
             pass
 
-    def extract_headers(self, url):
+    @staticmethod
+    def extract_headers(url):
         try:
             # Get headers of an URL.
-            return self.session.get(url).headers
+            return ScanConfig.session.get(url).headers
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when getting the headers.", url)
             pass
@@ -201,10 +202,11 @@ class Utilities(ScanConfig):
         return form_data
 
 
-    def extract_inputs(self, url):
+    @staticmethod
+    def extract_inputs(url):
         try:
             # Extract Inputs the same way forms are extracted
-            response = self.session.get(url, timeout=300)
+            response = ScanConfig.session.get(url, timeout=300)
             response.raise_for_status()
             parsed_html = BeautifulSoup(response.content, "html.parser")  # , from_encoding="iso-8859-1")
             return parsed_html.findAll("input")
@@ -315,9 +317,10 @@ class Utilities(ScanConfig):
             Utilities.print_except_message('error', e, "Something went wrong when extracting name value from a form.")
             pass
 
-    def extract_cookies(self):
+    @staticmethod
+    def extract_cookies():
         try:
-            return self.session.cookies.get_dict()
+            return ScanConfig.session.cookies.get_dict()
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when saving cookies.")
             pass
@@ -449,9 +452,10 @@ class Utilities(ScanConfig):
                                       url)
             pass
 
-    def check_hidden_tag(self, url, form_data):
+    @staticmethod
+    def check_hidden_tag(url, form_data):
         try:
-            inputs = self.extract_inputs(url)
+            inputs = Utilities.extract_inputs(url)
             for input in inputs:
                 if input['name'] in form_data:
                     if input['type'] == 'hidden':
@@ -536,3 +540,7 @@ class Utilities(ScanConfig):
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when SQL Types.")
             pass
+
+    @staticmethod
+    def str_bool(s):
+        return s.lower() in ("yes", "true", "t", "1")

@@ -1,0 +1,17 @@
+from Classes.Utilities import Utilities
+from CustomImports import html_report
+
+
+def run(main_url):
+    try:
+        headers = Utilities.extract_headers(main_url)
+        if 'strict' not in str(headers).lower():
+            html_report.add_vulnerability('HTTP Strict Transport Security not found',
+                                          'Application might be vulnerable to sniffing and certificate invalidation attacks. URL: {}'.format(
+                                              main_url), 'Low')
+
+        return
+    except Exception as e:
+        Utilities.print_except_message('error', e, "Something went wrong when testing Strict Transport on headers.",
+                                  main_url)
+        pass

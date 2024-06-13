@@ -13,6 +13,7 @@ class ScanConfig:
     # Initialize the ignored links and errors file parameters
     err_file = None
     ignored_links = None
+
     def __init__(self, url):
         try:
             # Initialize Scanner Configuration Parameters.
