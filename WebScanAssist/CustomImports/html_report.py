@@ -53,7 +53,8 @@ try:
             output = template.render(vulnerabilities=vulnerabilities, tree_json=tree_json, external_links=external_links,
                                      non_accessible_links=non_accessible_links, comments_dict=comments_dict)
             # Save the output to a file
-            with open(datetime.now().strftime('%Y-%m-%d_%H-%M') + '-report.html', 'w', encoding='utf-8') as f:
+            # with open('Vulnerability_Report_' + datetime.now().strftime('%Y-%m-%d_%H-%M') + '.html', 'w', encoding='utf-8') as f:
+            with open('report.html', 'w', encoding='utf-8') as f: # temp until on prod.
                 f.write(output)
 
             f.close()
