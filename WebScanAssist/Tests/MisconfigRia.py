@@ -11,8 +11,8 @@ def run(main_url):
         try:
             if '*' in content:
                 html_report.add_vulnerability('Overly Permissive Policy File found',
-                                              'Review Crossdomain.xml / Clientaccesspolicy.xml files. URL: {}'.format(
-                                                  main_url), 'Low')
+                                              'Overly Permissive Policy File found. URL: {}'.format(
+                                                  main_url), 'Low', comment="Review Crossdomain.xml / Clientaccesspolicy.xml files.")
         except TypeError:
             pass
         return

@@ -63,15 +63,14 @@ def run(url):
                                           'Insecure direct object reference (IDOR) vulnerability identified. URL: {}'.format(
                                               url), 'Medium', comment="Got reply from {}. If the URL is referencing objects, the application is vulnerable to this injection.".format(response_url))
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
-        if not (form_list or form_data_list):
-            return
-        for index, form in enumerate(form_list):
-            input_hidden = t_idor(url, form_data_list[index])
-            if input_hidden:
-                input_hidden= Utilities.escape_string_html(encoded_single=input_hidden)
-                html_report.add_vulnerability('IDOR',
-                                              'Possible Insecure direct object reference (IDOR) vulnerability identified on form. URL: {}'.format(
-                                                  url), 'Low', reply="\nInput: {}.".format(input_hidden), comment="\nFound hidden tag on form. Check tag for Object Reference.")
+        if form_list and form_data_list:
+            for index, form in enumerate(form_list):
+                input_hidden = t_idor(url, form_data_list[index])
+                if input_hidden:
+                    input_hidden= Utilities.escape_string_html(encoded_single=input_hidden)
+                    html_report.add_vulnerability('IDOR',
+                                                  'Possible Insecure direct object reference (IDOR) vulnerability identified on form. URL: {}'.format(
+                                                      url), 'Low', reply="\nInput: {}.".format(input_hidden), comment="\nFound hidden tag on form. Check tag for Object Reference.")
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing IDOR.", url)

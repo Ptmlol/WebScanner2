@@ -49,16 +49,15 @@ def t_i_code_exec_nfi(url):
 def run(url):
     try:
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
-        if not (form_list or form_data_list):
-            return
-        for index, form in enumerate(form_list):
-            payload, form_response_list = t_i_code_exec(url, form, form_data_list[index])
+        if form_list and form_data_list:
+            for index, form in enumerate(form_list):
+                payload, form_response_list = t_i_code_exec(url, form, form_data_list[index])
 
-            if form_response_list:
-                payload, form_response_list = Utilities.escape_string_html(form_response_list, payload)
-                html_report.add_vulnerability('Code Execution Injection',
-                                              'Code Execution Injection Vulnerability identified on URL: {}.'.format(
-                                                  url), 'High', payload=payload, reply="\nForm: {}.".format(form_response_list))
+                if payload:
+                    payload, form_response_list = Utilities.escape_string_html(form_list, payload)
+                    html_report.add_vulnerability('Code Execution Injection',
+                                                  'Code Execution Injection Vulnerability identified on URL: {}.'.format(
+                                                      url), 'High', payload=payload, reply="\nInjected Form (Original): {}.".format(form_response_list))
 
         # Non-form input
         if t_i_code_exec_nfi(url):

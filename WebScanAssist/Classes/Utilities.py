@@ -575,11 +575,11 @@ class Utilities(ScanConfig):
                 encoded_single = str(encoded_single).replace('\t', '   ')
 
             if encoded_single and not encoded_list:
-                return encoded_single
+                return "<br>" + encoded_single
             if encoded_list and not encoded_single:
                 return "<br><br>" + str(new_html) + '<br><br>'
             if encoded_list and encoded_single:
-                return encoded_single, "<br><br>" + str(new_html) + '<br><br>'
+                return "<br>" + encoded_single, "<br><br>" + str(new_html) + '<br><br>'
 
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when extracting tags from HTML Response.")

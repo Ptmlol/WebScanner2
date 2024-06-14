@@ -18,7 +18,7 @@ def run(url):
         if t_cors(url):
             html_report.add_vulnerability('Cross-Origin Resource Sharing',
                                           'Cross-Origin Resource Sharing (CORS) vulnerability identified on URL: {}'.format(
-                                              url), 'Low')
+                                              url), 'Low', comment="Access-Control-Allow-Origin is set to * (Any).")
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for CORS.", url)

@@ -47,14 +47,15 @@ def t_i_html_nfi(url):
 def run(url):
     try:
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
-        for index, form in enumerate(form_list):
-            payload, form_response_list = t_i_html(url, form, form_data_list[index])
-            # Print if Vulnerabilities are found.
-            if payload:
-                payload, form_response_list = Utilities.escape_string_html(form_response_list, payload)
-                html_report.add_vulnerability('HTML Injection',
-                                              'HTML Injection Vulnerability identified on URL: {}.'.format(
-                                                  url), 'Medium', payload=payload, reply="\nForm: {}.".format(form_response_list))
+        if form_list and form_data_list:
+            for index, form in enumerate(form_list):
+                payload, form_response_list = t_i_html(url, form, form_data_list[index])
+                # Print if Vulnerabilities are found.
+                if payload:
+                    payload, form_response_list = Utilities.escape_string_html(form_list, payload)
+                    html_report.add_vulnerability('HTML Injection',
+                                                  'HTML Injection Vulnerability identified on URL: {}.'.format(
+                                                      url), 'Medium', payload=payload, reply="\nInjected Form (Original): {}.".format(form_response_list))
 
         # Test on non-form inputs
         if t_i_html_nfi(url):

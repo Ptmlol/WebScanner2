@@ -51,14 +51,13 @@ def run(url):
     try:
         # Perform tests for each iFrame
         iframes = extract_iframes(url)
-        if not iframes:
-            return
-        for iframe in iframes:
-            iframe_url = t_i_iframe(url, iframe)
-            if iframe_url:
-                html_report.add_vulnerability('iFrame Injection',
-                                              'iFrame Injection Vulnerability identified on URL: {}.'.format(
-                                                  url), 'Low', reply="Iframe: {}".format(Utilities.escape_string_html(encoded_single=iframe)), comment="\nSuccessfully injected google.com Iframe over existing iFrame using Custom URL: {}.".format(iframe_url))
+        if iframes:
+            for iframe in iframes:
+                iframe_url = t_i_iframe(url, iframe)
+                if iframe_url:
+                    html_report.add_vulnerability('iFrame Injection',
+                                                  'iFrame Injection Vulnerability identified on URL: {}.'.format(
+                                                      url), 'Low', reply="Iframe: {}".format(Utilities.escape_string_html(encoded_single=iframe)), comment="\nSuccessfully injected google.com Iframe over existing iFrame using Custom URL: {}.".format(iframe_url))
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
         pass

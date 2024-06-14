@@ -23,7 +23,7 @@ def run(main_url):
         if t_weak_browser_cache(main_url):
             html_report.add_vulnerability('Cache Weakness',
                                           'Potential Browser Cache Weakness vulnerability identified.'.format(
-                                              main_url), 'Low')
+                                              main_url), 'Low', comment="Cache-Control is not properly configured on this application. ")
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing browser cache.", main_url)
         pass

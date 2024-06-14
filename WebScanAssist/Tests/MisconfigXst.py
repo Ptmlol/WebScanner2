@@ -21,7 +21,7 @@ def run(main_url):
         if t_xst(main_url):
             html_report.add_vulnerability('Cross-Site Tracing (XST)',
                                           'Cross-Site Tracing (XST) vulnerability identified on URL: {}'.format(
-                                              main_url), 'Low')
+                                              main_url), 'Low', comment="Got Status Code 200 from method TRACE.")
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for XST.", main_url)

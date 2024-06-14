@@ -24,7 +24,7 @@ def run(main_url):
         if t_i_host_header(main_url):
             html_report.add_vulnerability('Host-Header Injection',
                                           'Host-Header Injection vulnerability identified on URL: {}'.format(
-                                              main_url), 'Low')
+                                              main_url), 'Low', comment="Received Status Code 200 from 'Host' and 'X-Forwarded-Host' injection." )
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for Host Header Injection.", main_url)

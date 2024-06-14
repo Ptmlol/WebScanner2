@@ -8,7 +8,7 @@ def run(main_url):
         if 'strict' not in str(headers).lower():
             html_report.add_vulnerability('HTTP Strict Transport Security not found',
                                           'Application might be vulnerable to sniffing and certificate invalidation attacks. URL: {}'.format(
-                                              main_url), 'Low')
+                                              main_url), 'Low', comment="'Strict' tag not found in headers.")
 
         return
     except Exception as e:

@@ -139,7 +139,7 @@
         <div class="severity">Confidence: {{ vulnerability.severity }}</div>
         <div class="type">{{ vulnerability.type }}</div>
         <div class="details" onclick="toggleDropdown(this)">
-            <strong>Details:</strong>
+            <strong>+ Details:</strong>
             <pre>{{ vulnerability.details }}</pre>
             {% if vulnerability.dropdown_details %}
             <div class="dropdown">
@@ -148,11 +148,11 @@
                     {% endif %}
 
                     {% if vulnerability.dropdown_details.reply %}
-                        <pre>Got reply: {{vulnerability.dropdown_details.reply}}</pre>
+                        <pre>{{vulnerability.dropdown_details.reply}}</pre>
                     {% endif %}
 
                     {% if vulnerability.dropdown_details.comment %}
-                        <pre>Additional details: {{vulnerability.dropdown_details.comment}}</pre>
+                        <pre>Additional Information: {{vulnerability.dropdown_details.comment}}</pre>
                     {% endif %}
             {% endif %}
         </div>

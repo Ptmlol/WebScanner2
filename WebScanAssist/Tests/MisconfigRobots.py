@@ -21,7 +21,7 @@ def run(main_url, scan_type):
         if robots_urls:
             html_report.add_vulnerability('Robots.txt',
                                           'Robots.txt contains the following values: \n{}'.format(
-                                              [i.replace("'", "") for i in robots_urls]),
+                                              ['<br>' + str(i).replace("'", "").replace('[', '').replace(']', '') for i in robots_urls]),
                                           'Informational')
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing Robots.txt.", main_url)

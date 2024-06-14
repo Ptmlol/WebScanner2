@@ -6,7 +6,8 @@ from Classes.ScanConfig import ScanConfig
 from Classes.Utilities import Utilities
 from CustomImports import html_report
 
-#TODO: Do XSS (DOM) in DVWA as well
+#TODO: Do XSS (DOM) in DVWA as well and XML as well
+# TODO: Detect usage of eval() in DOM
 
 def t_i_xss(url, form, form_data):
     try:
@@ -22,12 +23,10 @@ def t_i_xss(url, form, form_data):
             if (str(xss_payload).lower() in str(response_injected.text).lower()) or (
                     str(xss_payload).lower() in str(html.unescape(response_injected.text.lower()))):
                 confidence += 1
-            if confidence > 0:
-                return True, confidence
-            elif xss_payload == DataStorage.payloads("XSS")[
-                -1] and confidence > 0:
-                return True, confidence
-        return False, 0
+            if confidence > 1:
+                forms, form_data = Utilities.extract_from_html_string('form', response_injected.text)
+                return xss_payload, forms
+        return None, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong testing XSS in form.", url)
         pass
@@ -38,11 +37,11 @@ def t_i_xss_nfi(url):
         for xss_payload in DataStorage.payloads("XSS"):
             response_injected = Utilities.no_form_input_content(url, xss_payload)
             if not response_injected:
-                return False
+                return None
             for response_inj in response_injected:
                 if xss_payload.lower() in response_inj.text.lower():
-                    return True
-        return False
+                    return xss_payload
+        return None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong testing XSS in form.", url)
         pass
@@ -59,8 +58,8 @@ def t_ua_xss(url):
                 continue
             # Check response type (time or feedback)
             if payload.lower() in response.text.lower():
-                return True
-        return False
+                return payload, headers
+        return None, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for User-Agent XSS Injections.",
                                   url)
@@ -70,27 +69,27 @@ def t_ua_xss(url):
 def run(url):
     try:
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
-        if not (form_list or form_data_list):
-            return
-        for index, form in enumerate(form_list):
-            xss_vuln, confidence = t_i_xss(url, form, form_data_list[index])
-            if xss_vuln:
-                if 0 < confidence <= 3:
+        if form_list and form_data_list:
+            for index, form in enumerate(form_list):
+                payload, response_form_list = t_i_xss(url, form, form_data_list[index])
+                if payload:
+                    payload, form_response_list = Utilities.escape_string_html(form_list, payload)
                     html_report.add_vulnerability('XSS Injection',
                                                   'XSS Injection vulnerability identified on form. URL: {}'.format(
-                                                      url), 'High')
-                else:
-                    html_report.add_vulnerability('XSS Injection',
-                                                  'XSS Injection vulnerability identified on form. URL: {}'.format(
-                                                      url), 'Critical')
-        if t_i_xss_nfi(url):
+                                                      url), 'High', payload=payload, reply="\nInjected Form (Original): {}.".format(form_response_list))
+
+        payload = t_i_xss_nfi(url)
+        if payload:
             html_report.add_vulnerability('XSS Injection',
                                           'XSS Injection vulnerability identified on URL: {}'.format(
-                                              url), 'High')
-        if t_ua_xss(url):
+                                              url), 'High', payload=payload, comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
+
+        payload, headers = t_ua_xss(url)
+        if payload:
+            payload = Utilities.escape_string_html(encoded_single=payload)
             html_report.add_vulnerability('User Agent XSS Injection',
                                           'XSS Injection vulnerability identified using custom User-Agent. URL: {}'.format(
-                                              url), 'Critical')
+                                              url), 'Critical', payload=payload, comment="\nUsed Custom injected Headers: {}.".format(headers))
         return 0
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong testing XSS in form.", url)

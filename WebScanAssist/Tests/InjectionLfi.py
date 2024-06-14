@@ -51,7 +51,7 @@ def run(url):
                 lfi_script, form_response_list = Utilities.escape_string_html(form_response_list_or_url, lfi_script)
                 html_report.add_vulnerability('Local File Inclusion (LFI)',
                                               'Local File Inclusion (LFI) vulnerability identified on URL: {}'.format(url),
-                                              'High', payload=lfi_script, reply="\nResponse Form: {}.".format(form_response_list), comment="Successfully used the above payload to perform Local File Inclusion (LFI).")
+                                              'High', payload=lfi_script, reply="\nInjection Form (Injected): {}.".format(form_response_list), comment="Successfully used the above payload to perform Local File Inclusion (LFI).")
             else:
                 new_url = form_response_list_or_url
                 html_report.add_vulnerability('Local File Inclusion (LFI)',

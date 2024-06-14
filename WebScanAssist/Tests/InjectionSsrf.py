@@ -12,12 +12,12 @@ def t_i_ssrf(url):
             url = url.replace('=', ssrf_payload)
             response = ScanConfig.session.get(url)
             if ssrf_payload in url and response.status_code == 200:
-                return True
+                return ssrf_payload, url
             ssrf_payload = '=file:///etc/passwd'
             url = url.replace('=', ssrf_payload)
             if ssrf_payload in url and "root:" in response.text.lower():
-                return True
-        return False
+                return ssrf_payload, url
+        return None, None
     except Exception as e:
         Utilities.print_except_message('error', e,
                                   "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)
@@ -26,10 +26,12 @@ def t_i_ssrf(url):
 
 def run(url):
     try:
-        if t_i_ssrf(url):
+        payload, new_url = t_i_ssrf(url)
+        if payload:
+            payload = Utilities.escape_string_html(encoded_single=payload)
             html_report.add_vulnerability('Server Side Request Forgery',
                                           'Server Side Request Forgery (SSRF) vulnerability identified on URL: {}'.format(
-                                              url), 'Low')
+                                              url), 'Low', payload=payload, reply="Successfully injected payload into URL: {}".format(url))
         return
     except Exception as e:
         Utilities.print_except_message('error', e,
