@@ -3,7 +3,7 @@ from CustomImports import html_report
 
 # TODO: Find why session wont be chanced ffs and check alternative ways of identification
 # TODO : Fix Strong Sessions
-
+# TODO: Transform output for dropdown
 def t_ba_session(url):
     # Search for session in the cookie.
     try:

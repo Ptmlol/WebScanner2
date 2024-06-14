@@ -40,7 +40,7 @@ def t_i_iframe(url, iframe):
         # If iFrame loads the new page it means it is vulnerable.
         if iframe_url:
             if iframe_payload in ScanConfig.session.get(iframe_url).text.lower():
-                return True
+                return iframe_url
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
@@ -50,11 +50,15 @@ def t_i_iframe(url, iframe):
 def run(url):
     try:
         # Perform tests for each iFrame
-        for iframe in extract_iframes(url):
-            if t_i_iframe(url, iframe):
+        iframes = extract_iframes(url)
+        if not iframes:
+            return
+        for iframe in iframes:
+            iframe_url = t_i_iframe(url, iframe)
+            if iframe_url:
                 html_report.add_vulnerability('iFrame Injection',
                                               'iFrame Injection Vulnerability identified on URL: {}.'.format(
-                                                  url), 'Low')
+                                                  url), 'Low', reply="Iframe: {}".format(Utilities.escape_string_html(encoded_single=iframe)), comment="\nSuccessfully injected google.com Iframe over existing iFrame using Custom URL: {}.".format(iframe_url))
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
         pass

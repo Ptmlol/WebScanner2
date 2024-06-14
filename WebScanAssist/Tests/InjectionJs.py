@@ -10,10 +10,19 @@ def t_i_js(url):
         js_payload = '/?javascript:alert(testedforjavascriptcodeexecutionrn3284)'
         if url[-1] != '/':
             new_url = url + js_payload
-            return js_payload in str(ScanConfig.session.get(new_url).text).lower()
+            response = ScanConfig.session.get(new_url)
+            if not response.text:
+                return None, None
+            if js_payload in str(response.text).lower():
+                return js_payload, new_url
         else:
             new_url = url + js_payload[1:]
-            return js_payload[1:] in str(ScanConfig.session.get(new_url).text).lower()
+            response = ScanConfig.session.get(new_url)
+            if not response.text:
+                return None, None
+            if js_payload[1:] in str(response.text).lower():
+                return js_payload[1:], new_url
+        return None, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)
         pass
@@ -21,10 +30,11 @@ def t_i_js(url):
 
 def run(url):
     try:
-        if t_i_js(url):
+        js_payload, new_url = t_i_js(url)
+        if js_payload:
             html_report.add_vulnerability('Javascript Code Injection',
                                           'Javascript Code Injection vulnerability identified on URL: {}'.format(url),
-                                          'High')
+                                          'Medium', reply="Successfully injected Javascript Code: {} into Custom URL: {}".format(js_payload, new_url), comment="If the application is not designed to accept JS code on this URL, this is a vulnerability.")
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)

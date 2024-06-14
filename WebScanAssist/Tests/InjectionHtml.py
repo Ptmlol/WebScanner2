@@ -8,7 +8,6 @@ from CustomImports import html_report
 def t_i_html(url, form, form_data):
     try:
         # Select injection points from form details
-        confidence = 0
         injection_keys = Utilities.extract_injection_fields_from_form(form_data)
         for html_payload in DataStorage.payloads("HTML"):
             # Inject each payload into each injection point
@@ -16,16 +15,12 @@ def t_i_html(url, form, form_data):
                 form_data[injection_key] = html_payload
             response_injected = Utilities.submit_form(url, form, form_data)
             if not response_injected:
-                return 0, 0
+                return None, None
             # Check for html_payload (tags included) in response, success execution if available.
-            if html_payload in response_injected.text:
-                confidence += 1
-            if confidence > 0:
-                return True, confidence
-            elif html_payload == DataStorage.payloads("HTML")[
-                -1] and confidence > 0:
-                return True, confidence
-        return False, 0
+            if html_payload.lower() in response_injected.text.lower():
+                forms, form_data = Utilities.extract_from_html_string('form', response_injected.text)
+                return html_payload, forms
+        return False, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing HTML Injection.", url)
         pass
@@ -53,22 +48,19 @@ def run(url):
     try:
         form_list, form_data_list = Utilities.extract_forms_and_form_data(url)
         for index, form in enumerate(form_list):
-            html_vuln, confidence = t_i_html(url, form, form_data_list[index])
+            payload, form_response_list = t_i_html(url, form, form_data_list[index])
             # Print if Vulnerabilities are found.
-            if html_vuln:
-                if 0 < confidence <= 3:
-                    html_report.add_vulnerability('HTML Injection',
-                                                  'HTML Injection Vulnerability identified on URL: {}.'.format(
-                                                      url), 'Low')
-                else:
-                    html_report.add_vulnerability('HTML Injection',
-                                                  'HTML Injection Vulnerability identified on URL: {}.'.format(
-                                                      url), 'High')
+            if payload:
+                payload, form_response_list = Utilities.escape_string_html(form_response_list, payload)
+                html_report.add_vulnerability('HTML Injection',
+                                              'HTML Injection Vulnerability identified on URL: {}.'.format(
+                                                  url), 'Medium', payload=payload, reply="\nForm: {}.".format(form_response_list))
+
         # Test on non-form inputs
         if t_i_html_nfi(url):
             html_report.add_vulnerability('HTML Injection',
                                           'HTML Injection Vulnerability identified on URL: {}.'.format(
-                                              url), 'Medium')
+                                              url), 'Medium', comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing HTML Injection.", url)
         pass

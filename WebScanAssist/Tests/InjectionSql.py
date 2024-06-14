@@ -144,11 +144,11 @@ def run(url):
                 if 0 < sql_conf <= 3:
                     html_report.add_vulnerability('SQL Injection',
                                                   'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}.'.format(
-                                                      url, Utilities.pretty_sql(str(sql_type))), 'Medium')
+                                                      url, Utilities.pretty_sql(str(sql_type))), 'Medium', 'CACACA', "TADADADASDASDASDASDASDASDASD")
                 else:
                     html_report.add_vulnerability('SQL Injection',
                                                   'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}'.format(
-                                                      url, Utilities.pretty_sql(str(sql_type))), 'Critical')
+                                                      url, Utilities.pretty_sql(str(sql_type))), 'Critical', 'cacacacaca', "TADADADASDASDASDASDASDASDASD")
         # Bulk up User-Agent SQL Injection detection in the same function
         if t_i_ua_sql(url):
             html_report.add_vulnerability('SQL Injection - User Agent',
@@ -159,12 +159,12 @@ def run(url):
         if t_i_sql_nfi(url):
             html_report.add_vulnerability('SQL Injection',
                                           'Time based (Blind) SQL Injection vulnerability identified on URL: {}.'.format(
-                                              url), 'Medium')
+                                              url), 'Medium', 'cacacacacac', "TADADADASDASDASDASDASDASDASD")
 
         if t_i_xml_sql(url):
             html_report.add_vulnerability('SQL Injection in XML tag',
                                           'SQL Injection in XML tag vulnerability identified on URL: {} using custom XML tags.'.format(
-                                              url), 'Critical')
+                                              url), 'Critical', 'cacacacacacaca', "TADADADASDASDASDASDASDASDASD")
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)

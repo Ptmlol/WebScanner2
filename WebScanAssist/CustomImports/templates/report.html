@@ -30,6 +30,7 @@
         .vulnerability {
             border-bottom: 1px solid #ddd;
             padding: 10px 0;
+            position: relative;
         }
 
         .vulnerability:last-child {
@@ -49,6 +50,15 @@
             background-color: #f9f9f9;
             padding: 10px;
             border-radius: 5px;
+            overflow-wrap: break-word;
+        }
+
+        /*.details:hover .dropdown {*/
+        /*    display: block; !* Show dropdown on hover *!*/
+        /*}*/
+        .details:hover {
+            background-color: #f1f1f1;
+            cursor: pointer;
         }
 
         .footer {
@@ -87,9 +97,38 @@
         .item-list li {
             margin: 5px 0;
         }
+
+        .dropdown {
+            max-height: 0; /* Start with height 0 */
+            overflow: hidden;
+            opacity: 0; /* Start with opacity 0 */
+            visibility: hidden; /* Start with visibility hidden */
+            width: 100%;
+            background-color: #f9f9f9;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        .dropdown.show {
+            max-height: 200px;
+            opacity: 1;
+            visibility: visible;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+        }
+
+        .dropdown pre {
+            /*padding: 8px 16px;*/
+            border-bottom: 1px solid #ddd;
+            white-space: pre-wrap;
+            margin: 0;
+            /*padding: 10px;
+        }
+
     </style>
 </head>
 <body>
+
 <div class="container">
     <h1>Vulnerability Report</h1>
     {% if vulnerabilities %}
@@ -99,9 +138,24 @@
     <div class="vulnerability">
         <div class="severity">Confidence: {{ vulnerability.severity }}</div>
         <div class="type">{{ vulnerability.type }}</div>
-        <div class="details">
+        <div class="details" onclick="toggleDropdown(this)">
             <strong>Details:</strong>
             <pre>{{ vulnerability.details }}</pre>
+            {% if vulnerability.dropdown_details %}
+            <div class="dropdown">
+                    {% if vulnerability.dropdown_details.payload %}
+                        <pre>Attempted Payload: {{ vulnerability.dropdown_details.payload }}</pre>
+                    {% endif %}
+
+                    {% if vulnerability.dropdown_details.reply %}
+                        <pre>Got reply: {{vulnerability.dropdown_details.reply}}</pre>
+                    {% endif %}
+
+                    {% if vulnerability.dropdown_details.comment %}
+                        <pre>Additional details: {{vulnerability.dropdown_details.comment}}</pre>
+                    {% endif %}
+            {% endif %}
+        </div>
         </div>
     </div>
     {% endfor %}
@@ -160,6 +214,23 @@
 </div>
 
 <script>
+function toggleDropdown(element) {
+    const dropdown = element.querySelector('.dropdown');
+    const isVisible = dropdown.classList.contains('show');
+
+    if (!isVisible) {
+        dropdown.classList.add('show');
+    }
+}
+
+// Close the dropdown if the user clicks outside of it
+window.onclick = function(event) {
+    if (!event.target.closest('.details')) {
+        document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show'));
+    }
+}
+
+
     const firstPrint = true;
     function printTree(
         initialTree,
@@ -206,7 +277,6 @@
 
     const tree = JSON.parse('{{tree_json}}');
     printTree(tree, node => node === 'root' ? `root` : `<a href="${node.name}">${node.name}</a>`, node => node.children,)
-
 </script>
 </body>
 </html>

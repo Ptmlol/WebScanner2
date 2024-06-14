@@ -12,8 +12,8 @@ non_accessible_links = set()
 comments_dict = {}
 
 try:
-    def add_vulnerability(v_type, details, confidence='Critical'):
-        temp_dict = {'type': v_type, 'details': details, 'severity': confidence}
+    def add_vulnerability(v_type, details, confidence='Critical', payload=None, reply=None, comment=None):
+        temp_dict = {'type': v_type, 'details': details, 'severity': confidence, 'dropdown_details': {'payload': payload, 'reply': reply, 'comment': comment}}
         vulnerabilities.append(temp_dict)
         return
 

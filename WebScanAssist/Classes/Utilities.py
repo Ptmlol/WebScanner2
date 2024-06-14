@@ -469,7 +469,7 @@ class Utilities(ScanConfig):
             for input in inputs:
                 if input['name'] in form_data:
                     if input['type'] == 'hidden':
-                        return True
+                        return input
             return False
         except Exception:
             # Ignore if input not found
@@ -529,6 +529,60 @@ class Utilities(ScanConfig):
             return None, None
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when extracting XML tags.", url)
+            pass
+
+    @staticmethod
+    def extract_from_html_string(type, response_string):
+        try:
+            form_data_list = []
+            soup = BeautifulSoup(response_string, "html.parser")
+            if type == 'form':
+                return [soup.findAll('form')], None
+            elif type == 'form_data':
+                all_forms = soup.findAll('form')
+                try:
+                    for form in all_forms:
+                        form_data_list.append(Utilities.extract_form_details(form))
+                    return [all_forms], form_data_list
+                except:
+                    pass
+            elif type == 'data':
+                all_forms = soup.findAll('form')
+                for form in all_forms:
+                    form_data_list.append(Utilities.extract_form_details(form))
+                return [None], form_data_list
+        except Exception as e:
+            Utilities.print_except_message('error', e, "Something went wrong when extracting tags from HTML Response.")
+            pass
+
+    @staticmethod
+    def escape_string_html(encoded_list=None, encoded_single=None):
+        try:
+            new_html = []
+            if encoded_list:
+                for encoded_entity in encoded_list:
+                    encoded_entity = str(encoded_entity).replace('<', '&lt;')
+                    encoded_entity = str(encoded_entity).replace('>', '&gt;')
+                    encoded_entity = str(encoded_entity).replace('\n', '<br>')
+                    encoded_entity = str(encoded_entity).replace('\t', '   ')
+                    new_html.append(encoded_entity)
+                new_html = str(new_html).replace('[', '').replace(']', '')
+
+            if encoded_single:
+                encoded_single = str(encoded_single).replace('<', '&lt;')
+                encoded_single = str(encoded_single).replace('>', '&gt;')
+                encoded_single = str(encoded_single).replace('\n', '<br>')
+                encoded_single = str(encoded_single).replace('\t', '   ')
+
+            if encoded_single and not encoded_list:
+                return encoded_single
+            if encoded_list and not encoded_single:
+                return "<br><br>" + str(new_html) + '<br><br>'
+            if encoded_list and encoded_single:
+                return encoded_single, "<br><br>" + str(new_html) + '<br><br>'
+
+        except Exception as e:
+            Utilities.print_except_message('error', e, "Something went wrong when extracting tags from HTML Response.")
             pass
 
     @staticmethod

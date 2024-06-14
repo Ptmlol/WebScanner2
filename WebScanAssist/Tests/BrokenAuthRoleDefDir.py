@@ -7,7 +7,7 @@ def t_ba_role_definition_directories(url):
     try:
         link = url.lower()
         if "admin" in link or "administrator" in link or "mod" in link or "moderator" in link:
-            return True
+            return link
         return False
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for role definition directories.",
@@ -17,10 +17,11 @@ def t_ba_role_definition_directories(url):
 
 def run(url):
     try:
-        if t_ba_role_definition_directories(url):
+        def_link = t_ba_role_definition_directories(url)
+        if def_link:
             html_report.add_vulnerability('Administrator roles defined in URL',
                                           'Administrator roles defined in URL identified on URL: {}. Session can be hijacked!'.format(
-                                              url), 'High')
+                                              url), 'High', comment="Identified URL: {}".format(def_link))
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for role definition directories.",
                                   url)

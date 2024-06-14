@@ -13,7 +13,6 @@ from Tests import InjectionIframe, InjectionSql, InjectionCodeExec, InjectionPhp
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 # DVWA : https://github.com/digininja/DVWA
-
 # Scanner class handles scan jobs
 class Scanner(Utilities):
     def __init__(self, url, username=None, password=None, static_scan=None):
