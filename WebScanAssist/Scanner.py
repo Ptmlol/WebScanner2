@@ -44,7 +44,7 @@ class Scanner(Utilities):
             for url in self.DataStorage.urls:
 
                 print("\nTesting URL: ", url)
-                # Injections:
+                # # # Injections: # TODO: One of the 4 below is VERY slow
                 if Utilities.str_bool(self.config_params['TEST']['sql_tests']):
                     InjectionSql.run(url)
                 if Utilities.str_bool(self.config_params['TEST']['iframe_tests']):
@@ -53,6 +53,8 @@ class Scanner(Utilities):
                     InjectionCodeExec.run(url)
                 if Utilities.str_bool(self.config_params['TEST']['php_execution_tests']):
                     InjectionPhpExec.run(url)
+
+
                 if Utilities.str_bool(self.config_params['TEST']['ssi_tests']):
                     InjectionSsi.run(url)
                 if Utilities.str_bool(self.config_params['TEST']['xss_tests']):
@@ -70,7 +72,6 @@ class Scanner(Utilities):
                 if Utilities.str_bool(self.config_params['TEST']['html_tests']):
                     InjectionHtml.run(url)
 
-
                 # Broken Authentications:
                 if Utilities.str_bool(self.config_params['TEST']['ba_role_def_dir_tests']):
                     BrokenAuthRoleDefDir.run(url)
@@ -79,11 +80,9 @@ class Scanner(Utilities):
                 if Utilities.str_bool(self.config_params['TEST']['ba_session_tests']):
                     BrokenAuthSession.run(url)
 
-
                 # Security Misconfigurations:
                 if Utilities.str_bool(self.config_params['TEST']['cors_tests']):
                     MisconfigCors.run(url)
-
 
                 #Misc
                 if Utilities.str_bool(self.config_params['TEST']['comments_tests']):

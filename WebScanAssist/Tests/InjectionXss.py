@@ -80,6 +80,7 @@ def run(url):
 
         payload = t_i_xss_nfi(url)
         if payload:
+            payload = Utilities.escape_string_html(encoded_single=payload)
             html_report.add_vulnerability('XSS Injection',
                                           'XSS Injection vulnerability identified on URL: {}'.format(
                                               url), 'High', payload=payload, comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
@@ -87,6 +88,7 @@ def run(url):
         payload, headers = t_ua_xss(url)
         if payload:
             payload = Utilities.escape_string_html(encoded_single=payload)
+            headers = Utilities.escape_string_html(encoded_single=headers)
             html_report.add_vulnerability('User Agent XSS Injection',
                                           'XSS Injection vulnerability identified using custom User-Agent. URL: {}'.format(
                                               url), 'Critical', payload=payload, comment="\nUsed Custom injected Headers: {}.".format(headers))

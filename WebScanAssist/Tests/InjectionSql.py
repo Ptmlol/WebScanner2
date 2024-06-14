@@ -147,6 +147,8 @@ def run(url):
         # Bulk up User-Agent SQL Injection detection in the same function
         payload, headers = t_i_ua_sql(url)
         if payload:
+            payload = Utilities.escape_string_html(encoded_single=payload)
+            headers = Utilities.escape_string_html(encoded_single=headers)
             html_report.add_vulnerability('SQL Injection - User Agent',
                                           'SQL Injection vulnerability identified on URL: {} using custom User-Agent.'.format(
                                               url), 'Critical', payload=payload, comment="\nUsed Custom injected Headers: {}.".format(headers))
