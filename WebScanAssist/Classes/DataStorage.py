@@ -8,13 +8,15 @@ class DataStorage:
     sql_dict = {}
     html_inj = []
     xss_inj = None
+    word_list = []
+    urls = set()
+
     def __init__(self):
-        self.urls = set()
         self.related_domains = set()
         self.links_other = set()
 
         with open(os.getcwd() + '/Payloads/UserAgents/user_agents.txt', 'r', encoding="utf8") as f:
-           self.user_agents = f.readlines()
+            self.user_agents = f.readlines()
         f.close()
 
     # https://github.com/payloadbox/sql-injection-payload-list
@@ -49,6 +51,12 @@ class DataStorage:
                         DataStorage.xss_inj = f.readlines()
                 f.close()
                 return DataStorage.xss_inj
+            elif p_type == "WORDS":
+                for filename in os.listdir(os.getcwd() + '/Payloads/WordLists/'):
+                    with open(os.path.join(os.getcwd() + '/Payloads/WordLists/', filename), 'r', encoding="utf8") as f:
+                        DataStorage.word_list.extend(f.readlines())
+                f.close()
+                return DataStorage.word_list
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong. Payload files cannot be read.")
             print(Fore.RESET)

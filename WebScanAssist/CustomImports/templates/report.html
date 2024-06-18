@@ -1,277 +1,289 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-        <meta id="my-data" data-name="{{tree_json}}">
-        <title>Vulnerability Report</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 0;
-                background-color: #f4f4f4;
-            }
-
-            .container {
-                width: 80%;
-                margin: 5px auto;
-                padding: 20px;
-                background-color: #fff;
-                box-shadow: 5px 0 10px rgba(0, 0, 0, 0.1);
-            }
-
-            h1 {
-                text-align: center;
-                color: #333;
-            }
-
-            .vulnerability {
-                border-bottom: 1px solid #ddd;
-                padding: 10px 0;
-                position: relative;
-            }
-
-            .vulnerability:last-child {
-                border-bottom: none;
-            }
-
-            .severity {
-                font-weight: bold;
-                color: #e74c3c;
-            }
-
-            .type {
-                margin: 10px 0;
-            }
-
-            .details {
-                background-color: #f9f9f9;
-                padding: 10px;
-                border-radius: 5px;
-                overflow-wrap: break-word;
-            }
-
-            .details:hover {
-                background-color: #f1f1f1;
-                cursor: pointer;
-            }
-
-            .footer {
-                text-align: center;
-                padding: 20px 0;
-                color: #aaa;
-            }
-
-            .url-list {
-                list-style-type: none;
-                padding: 0;
-            }
-
-            .url-list li {
-                margin-bottom: 20px;
-                padding: 15px;
-                background-color: #fff;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                transition: box-shadow 0.3s ease;
-            }
-
-            .url-list li:hover {
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            }
-
-            .url-list a {
-                color: #007BFF;
-                text-decoration: none;
-                font-weight: bold;
-            }
-
-            .url-list a:hover {
-                text-decoration: underline;
-            }
-
-            .item-list {
-                list-style-type: disc;
-                margin: 10px 0 0 20px;
-                padding: 0;
-            }
-
-            .item-list li {
-                margin: 5px 0;
-            }
-
-            .dropdown {
-                max-height: 0; /* Start with height 0 */
-                overflow: hidden;
-                opacity: 0; /* Start with opacity 0 */
-                visibility: hidden; /* Start with visibility hidden */
-                width: 100%;
-                background-color: #f9f9f9;
-                box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-                margin-top: 10px;
-                cursor: pointer;
-            }
-
-            .dropdown.show {
-                max-height: 200px;
-                opacity: 1;
-                visibility: visible;
-                transition: max-height 0.3s ease, opacity 0.3s ease;
-            }
-
-            .dropdown pre {
-                padding: 8px 16px;
-                border-bottom: 1px solid #ddd;
-                white-space: pre-wrap;
-                margin: 0;
-            }
-
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Vulnerability Report</h1>
-            {% if vulnerabilities %}
-            <h4>Vulnerability Scan Result:</h4>
-            {% endif %}
-            {% for vulnerability in vulnerabilities %}
-            <div class="vulnerability">
-                <div class="severity">Confidence: {{ vulnerability.severity }}</div>
-                <div class="type">{{ vulnerability.type }}</div>
-                <div class="details" onclick="toggleDropdown(event)">
-                    <strong>+ Details:</strong>
-                    <pre>{{ vulnerability.details }}</pre>
-                    {% if vulnerability.dropdown_details %}
-                    <div class="dropdown">
-                            {% if vulnerability.dropdown_details.payload %}
-                                <pre>Attempted Payload: {{ vulnerability.dropdown_details.payload }}</pre>
-                            {% endif %}
-
-                            {% if vulnerability.dropdown_details.reply %}
-                                <pre>{{vulnerability.dropdown_details.reply}}</pre>
-                            {% endif %}
-
-                            {% if vulnerability.dropdown_details.comment %}
-                                <pre>Additional Information: {{vulnerability.dropdown_details.comment}}</pre>
-                            {% endif %}
-                    {% endif %}
-                </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        {% if tree_json|length > 32 %}
-        <div class="container">
-            <h4>Application URL Map:</h4>
-            <pre class="details" id="output"></pre>
-        </div>
-        {% endif %}
-
-        {% if non_accessible_links %}
-        <div class="container">
-            <h4>External URLs:</h4>
-            {% for link in non_accessible_links %}
-            <div class="item-list">{{ link }}</div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        {% if comments_dict %}
-        {% if comments_dict|length > 1 %}
-        <div class="container">
-            <h4>URL Comments:</h4>
-            <ol class="item-list">
-                {% for url, value in comments_dict.items() %}
-                {% if value %}
-                <li>
-                    <a href="{{ url }}">{{ url }}/</a>
-                    <ul class="url-list">
-                        {% for elem in value %}
-                       <li><pre>{{ elem|e }}</pre></li>
-                        {% endfor %}
-                    </ul>
-                </li>
-                {% endif %}
-                {% endfor %}
-            </ol>
-        </div>
-        {% endif %}
-        {% endif %}
-
-
-        {% if external_links %}
-        <div class="container">
-            <h4>External URLs:</h4>
-            {% for link in external_links %}
-            <div class="item-list">{{ link }}</div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        <div class="footer">
-            &copy; 2024 Python Web Vulnerability Scanner - Naiboiu Teodor
-        </div>
-
-        <script>
-
-        function toggleDropdown(event) {
-            event.target.querySelector('.dropdown').classList.add('show');
-            console.log(event)
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <meta id="my-data" data-name="{{tree_json}}">
+    <title>Vulnerability Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
         }
 
-        window.onclick = function(event) {
+        .container {
+            width: 80%;
+            margin: 5px auto;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 5px 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .vulnerability {
+            border-bottom: 1px solid #ddd;
+            padding: 10px 0;
+            position: relative;
+        }
+
+        .vulnerability:last-child {
+            border-bottom: none;
+        }
+
+        .severity {
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .type {
+            margin: 10px 0;
+        }
+
+        .details {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-wrap: break-word;
+        }
+
+        .details:hover {
+            background-color: #f1f1f1;
+            cursor: pointer;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px 0;
+            color: #aaa;
+        }
+
+        .url-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .url-list li {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .url-list li:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .url-list a {
+            color: #007BFF;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .url-list a:hover {
+            text-decoration: underline;
+        }
+
+        .item-list {
+            list-style-type: disc;
+            margin: 10px 0 0 20px;
+            padding: 0;
+        }
+
+        .item-list li {
+            margin: 5px 0;
+        }
+
+        .dropdown {
+            max-height: 0; /* Start with height 0 */
+            overflow: hidden;
+            opacity: 0; /* Start with opacity 0 */
+            visibility: hidden; /* Start with visibility hidden */
+            width: 100%;
+            background-color: #f9f9f9;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        .dropdown.show {
+            max-height: 200px;
+            opacity: 1;
+            visibility: visible;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+        }
+
+        .dropdown pre {
+            padding: 8px 16px;
+            border-bottom: 1px solid #ddd;
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Vulnerability Report</h1>
+    {% if vulnerabilities %}
+    <h4>Vulnerability Scan Result:</h4>
+    {% endif %}
+    {% for vulnerability in vulnerabilities %}
+    <div class="vulnerability">
+        <div class="severity">Confidence: {{ vulnerability.severity }}</div>
+        <div class="type">{{ vulnerability.type }}</div>
+        <div class="details" onclick="toggleDropdown(event)">
+            <strong>+ Details:</strong>
+            <pre>{{ vulnerability.details }}</pre>
+            {% if vulnerability.dropdown_details %}
+            <div class="dropdown">
+                {% if vulnerability.dropdown_details.payload %}
+                <pre>Attempted Payload: {{ vulnerability.dropdown_details.payload }}</pre>
+                {% endif %}
+
+                {% if vulnerability.dropdown_details.reply %}
+                <pre>{{vulnerability.dropdown_details.reply}}</pre>
+                {% endif %}
+
+                {% if vulnerability.dropdown_details.comment %}
+                <pre>Additional Information: {{vulnerability.dropdown_details.comment}}</pre>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if tree_json|length > 32 %}
+<div class="container">
+    <h4>Application URL Map:</h4>
+    <pre class="details" id="output"></pre>
+</div>
+{% endif %}
+
+{% if non_accessible_links %}
+<div class="container">
+    <h4>External URLs:</h4>
+    {% for link in non_accessible_links %}
+    <div class="item-list">{{ link }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if comments_dict %}
+<div class="container">
+    <h4>URL Comments:</h4>
+    <ol class="item-list">
+        {% for url, value in comments_dict.items() %}
+        {% if value %}
+        <li>
+            <a href="{{ url }}">{{ url }}/</a>
+            <ul class="url-list">
+                {% for elem in value %}
+                <li>
+                    <pre>{{ elem|e }}</pre>
+                </li>
+                {% endfor %}
+            </ul>
+        </li>
+        {% endif %}
+        {% endfor %}
+    </ol>
+</div>
+{% endif %}
+
+
+{% if external_links %}
+<div class="container">
+    <h4>External URLs:</h4>
+    {% for link in external_links %}
+    <div class="item-list">{{ link }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if hidden_paths %}
+<div class="container">
+    <h4>Hidden URLs:</h4>
+    {% for vuln_path in hidden_paths %}
+    <div class="item-list">
+        <pre>{{ vuln_path.path }}. Got Status Code: {{ vuln_path.status_code }}</pre>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="footer">
+    &copy; 2024 Python Web Vulnerability Scanner - Naiboiu Teodor
+</div>
+
+<script>
+
+    function toggleDropdown(event) {
+        event.target.querySelector('.dropdown').classList.add('show');
+        console.log(event)
+    }
+
+    window.onclick = function (event) {
         if (!event.target.closest('.details')) {
             document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show'));
+        }
+    }
+
+    function printTree(
+        initialTree,
+        printNode,
+        getChildren,
+    ) {
+        function printBranch(tree, branch) {
+            const isGraphHead = branch.length === 0;
+            const children = getChildren(tree) || [];
+
+            let branchHead = '';
+
+            if (!isGraphHead) {
+                branchHead = children && children.length !== 0 ? '┬ ' : '─ ';
             }
+
+            const toPrint = printNode(tree, `${branch}${branchHead}`);
+
+            if (typeof toPrint === 'string') {
+
+                if (toPrint !== '<a href="-1">-1</a>') {
+                    const outputDiv = document.getElementById('output');
+                    outputDiv.innerHTML += `${branch}${branchHead}${toPrint}\n`;
+                }
+            }
+
+            let baseBranch = branch;
+
+            if (!isGraphHead) {
+                const isChildOfLastBranch = branch.slice(-2) === '└─';
+                baseBranch = branch.slice(0, -2) + (isChildOfLastBranch ? '  ' : '│ ');
+            }
+
+            const nextBranch = baseBranch + '├─';
+            const lastBranch = baseBranch + '└─';
+
+            children.forEach((child, index) => {
+                printBranch(child, children.length - 1 === index ? lastBranch : nextBranch);
+            });
         }
 
-            function printTree(
-                initialTree,
-                printNode,
-                getChildren,
-            ) {
-                function printBranch(tree, branch) {
-                    const isGraphHead = branch.length === 0;
-                    const children = getChildren(tree) || [];
+        printBranch(initialTree, '');
+    }
 
-                    let branchHead = '';
-
-                    if (!isGraphHead) {
-                        branchHead = children && children.length !== 0 ? '┬ ' : '─ ';
-                    }
-
-                    const toPrint = printNode(tree, `${branch}${branchHead}`);
-
-                    if (typeof toPrint === 'string') {
-
-                        if (toPrint !== '<a href="-1">-1</a>') {
-                            const outputDiv = document.getElementById('output');
-                            outputDiv.innerHTML += `${branch}${branchHead}${toPrint}\n`;
-                        }
-                    }
-
-                    let baseBranch = branch;
-
-                    if (!isGraphHead) {
-                        const isChildOfLastBranch = branch.slice(-2) === '└─';
-                        baseBranch = branch.slice(0, -2) + (isChildOfLastBranch ? '  ' : '│ ');
-                    }
-
-                    const nextBranch = baseBranch + '├─';
-                    const lastBranch = baseBranch + '└─';
-
-                    children.forEach((child, index) => {
-                        printBranch(child, children.length - 1 === index ? lastBranch : nextBranch);
-                    });
-                }
-
-                printBranch(initialTree, '');
-            }
-            const tree = JSON.parse('{{tree_json}}');
-            printTree(tree, node => node === 'root' ? `root` : `<a href="${node.name}">${node.name}</a>`, node => node.children,)
-        </script>
-    </body>
+    const tree = JSON.parse('{{tree_json}}');
+    printTree(tree, node => node === 'root' ? `root` : `<a href="${node.name}">${node.name}</a>`, node => node.children,)
+</script>
+</body>
 </html>

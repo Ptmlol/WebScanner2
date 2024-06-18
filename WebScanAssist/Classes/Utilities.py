@@ -12,7 +12,6 @@ import urllib.request
 import re
 from colorama import Fore
 
-
 from CustomImports import html_report
 
 firstCallSpider = 1
@@ -70,8 +69,8 @@ class Utilities(ScanConfig):
             return False
         except Exception as e:
             Utilities.print_except_message('error', e,
-                                      "Something went wrong when attempting to extract the login details. Quitting..",
-                                      url)
+                                           "Something went wrong when attempting to extract the login details. Quitting..",
+                                           url)
             quit()
 
     def check_sec_input(self, sec_level):
@@ -92,14 +91,14 @@ class Utilities(ScanConfig):
             if firstCallSpider:
                 self.link_pairs.append(['-1', url])
                 response = self.session.get(url)
-                #print("Provided URL", url)
-                #print("Actual URL", self.session.get(url).url)
+                # print("Provided URL", url)
+                # print("Actual URL", self.session.get(url).url)
                 self.DataStorage.urls.add(url)
                 firstCallSpider = 0
             else:
                 response = self.session.get(url)
-            #print("Provided URL", url)
-            #print("Actual URL", self.session.get(url).url)
+            # print("Provided URL", url)
+            # print("Actual URL", self.session.get(url).url)
             # If 200, then endpoint is accessible
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, "html.parser")
@@ -113,8 +112,9 @@ class Utilities(ScanConfig):
                                                                                                                                     self.url).group(1):
                             # Add URLs to main list object, ignore the user - ignored ones.
                             # [[a.html,b.html], [b.html,c.html], [a,d], [a,g], [g,h], [b,j]]
-                            if extracted_url not in self.DataStorage.urls and not any(ignored in extracted_url for ignored in self.ignored_links):
+                            if extracted_url not in self.DataStorage.urls:
                                 self.link_pairs.append([url, extracted_url])
+                            if extracted_url not in self.DataStorage.urls and not any(ignored.replace(" ", "") in extracted_url for ignored in self.ignored_links):
                                 self.DataStorage.urls.add(extracted_url)
                                 self.spider(extracted_url)
                         else:
@@ -143,7 +143,7 @@ class Utilities(ScanConfig):
         try:
             # Extract all forms from an URL.
 
-            response = ScanConfig.session.get(url, timeout=10)
+            response = ScanConfig.session.get(url, timeout=25)
             response.raise_for_status()
             parsed_html = BeautifulSoup(response.content, "html.parser")
             return parsed_html.findAll("form")
@@ -151,8 +151,8 @@ class Utilities(ScanConfig):
             if e.response.status_code == 500:
                 return None
             Utilities.print_except_message('error', e,
-                                      "Something went wrong when extracting forms from links. A HTTP error occurred.",
-                                      url)
+                                           "Something went wrong when extracting forms from links. A HTTP error occurred.",
+                                           url)
             pass
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when extracting forms from links.", url)
@@ -182,7 +182,7 @@ class Utilities(ScanConfig):
                     if (str(field.get('name')).lower() == 'submit') or (str(field.get('type')).lower() == 'submit') or (str(field.get('name')).lower() == 'user_token'):
                         form_data[field.get('name')] = field.get('value')
                         continue
-                    form_data[field.get('name')] = '' # field.get('value', 'submit')
+                    form_data[field.get('name')] = ''  # field.get('value', 'submit')
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when extracting forms details.")
             pass
@@ -208,7 +208,6 @@ class Utilities(ScanConfig):
             pass
         return form_data
 
-
     @staticmethod
     def extract_inputs(url):
         try:
@@ -219,8 +218,8 @@ class Utilities(ScanConfig):
             return parsed_html.findAll("input")
         except requests.HTTPError as e:
             Utilities.print_except_message('error', e,
-                                      "Something went wrong when extracting inputs from links. A HTTP error occurred",
-                                      url)
+                                           "Something went wrong when extracting inputs from links. A HTTP error occurred",
+                                           url)
             pass
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when extracting inputs from links.", url)
@@ -246,9 +245,9 @@ class Utilities(ScanConfig):
                 action_url = url
             # Send data accordingly to method.
             if method == 'GET':
-                response = ScanConfig.session.get(action_url, params=form_data, timeout=10)
+                response = ScanConfig.session.get(action_url, params=form_data, timeout=30)
             else:
-                response = ScanConfig.session.post(action_url, data=form_data, timeout=10)
+                response = ScanConfig.session.post(action_url, data=form_data, timeout=30)
             response.raise_for_status()
             return response
         except requests.HTTPError:
@@ -267,7 +266,7 @@ class Utilities(ScanConfig):
             # If injectable tags exists
             if extracted_uri and extracted_tag:
                 # Get the first content of the first identified tag and inject it with the custom XXE variable
-                prepared_tag =  re.sub(r'(<[^>]+>)([^<]+)(</[^>]+>)', r'\1' + '&XXE;' + r'\3', extracted_tag, count=1)
+                prepared_tag = re.sub(r'(<[^>]+>)([^<]+)(</[^>]+>)', r'\1' + '&XXE;' + r'\3', extracted_tag, count=1)
                 # Prepare the payload with specific requirements such as identified tags.
                 xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
                 <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
@@ -362,7 +361,7 @@ class Utilities(ScanConfig):
             html_report.create_tree(self.link_pairs)
         except Exception as e:
             Utilities.print_except_message('error', e,
-                                      "Something went wrong when checking for login requirements or scan options. Quitting..")
+                                           "Something went wrong when checking for login requirements or scan options. Quitting..")
             quit()
 
     def extract_non_form_inputs(self, url):
@@ -458,8 +457,8 @@ class Utilities(ScanConfig):
                 pass
         except Exception as e:
             Utilities.print_except_message('error', e,
-                                      "Something went wrong when extracting inputs outside of forms or with forms with no method.",
-                                      url)
+                                           "Something went wrong when extracting inputs outside of forms or with forms with no method.",
+                                           url)
             pass
 
     @staticmethod

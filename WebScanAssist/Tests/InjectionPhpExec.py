@@ -4,8 +4,10 @@ from Classes.ScanConfig import ScanConfig
 from Classes.Utilities import Utilities
 from CustomImports import html_report
 
+
 # TODO: Get PHP Exec code
 # TODO: Maybe Add PHP Exec to forms as well.
+
 def t_i_php_exec(url):
     try:
         # URL escaped since it is injected into URL
@@ -25,7 +27,7 @@ def t_i_php_exec(url):
         return None, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for PHP Code Execution Injection.",
-                                  url)
+                                       url)
         pass
 
 
@@ -39,5 +41,5 @@ def run(url):
                                               url), 'High', payload=payload, reply="\nCustom URL: {}.".format(new_url), comment="Successfully injected PHP Code into URL.")
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for PHP Code Execution Injection.",
-                                  url)
+                                       url)
         pass

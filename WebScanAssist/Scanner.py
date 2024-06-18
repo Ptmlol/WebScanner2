@@ -11,13 +11,16 @@ from Classes.Utilities import Utilities
 from Tests import InjectionIframe, InjectionSql, InjectionCodeExec, InjectionPhpExec, InjectionSsi, \
     BrokenAuthRoleDefDir, BrokenAuthRoleDefCookie, InjectionXss, InjectionIdor, MisconfigCors, InjectionSsrf, \
     InjectionXml, InjectionLfi, InfoComments, InjectionHtml, BrokenAuthSession, MisconfigBrowserCache, MisconfigXst, \
-    MisconfigHhi, MisconfigHttp, MisconfigHsts, MisconfigRia, MisconfigRobots, InjectionJs
+    MisconfigHhi, MisconfigHttp, MisconfigHsts, MisconfigRia, MisconfigRobots, InjectionJs, InfoDirTransversal
 import threading
 
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
+
+# TODO: Fix empty comment list for dvwa app in report.
 # DVWA : https://github.com/digininja/DVWA
 # Scanner class handles scan jobs
+
 class Scanner(Utilities):
     def __init__(self, url, username=None, password=None, static_scan=None):
         Utilities.__init__(self, url)
@@ -25,15 +28,16 @@ class Scanner(Utilities):
         self.check_scan_build_url(url, username, password, static_scan)
         self.username = username
         self.password = password
+        self.base_url = min(self.DataStorage.urls, key=len)
 
     def scan(self):
         try:
             # Scan app
-            Scanner.app_scan(self.url)
+            Scanner.app_scan(self.base_url)
             threads_main = []
 
             # Scan harvested URLs in sub_lists.
-            for url_set in list(Scanner.split_list(list(self.DataStorage.urls),math.ceil(len(list(self.DataStorage.urls))/5))):
+            for url_set in list(Scanner.split_list(list(self.DataStorage.urls), math.ceil(len(list(self.DataStorage.urls)) / 5))):
                 threads_main.append(threading.Thread(target=Scanner.run_thread, args=(url_set,)))
 
             for thread in threads_main:
@@ -48,10 +52,9 @@ class Scanner(Utilities):
                                       "Something went wrong when attempting to initialize scan function. Quitting..")
             quit()
 
-
     @staticmethod
     def app_scan(url):
-        # Generic app tests over whole app. 1 base URL. # TODO: Get the smallest URL harvested (domain of the scanned app).
+        # Generic app tests over whole app. 1 base URL.
         if Scanner.config_params['TEST']['browser_cache_tests']:
             MisconfigBrowserCache.run(url)
         if Scanner.config_params['TEST']['xst_tests']:
@@ -117,18 +120,36 @@ class Scanner(Utilities):
         if Utilities.str_bool(Scanner.config_params['TEST']['xss_tests']):
             InjectionXss.run(url)
 
+    # TODO: Fix Threading for harvesting.
+
     @staticmethod
     def run_thread(lst):
-        for url in lst:
-            threads = []
-            print("\nTesting URL: ", url)
-            # Create threads for each function
+        if Utilities.str_bool(Scanner.config_params['TEST']['harvest_url']):
+            try:
+                for i in range(0, len(lst), 3):
+                    print("Harvesting URL: ", lst[i])
+                    print("Harvesting URL: ", lst[i + 1])
+                    print("Harvesting URL: ", lst[i + 2])
+                    hidden_url_thread = [threading.Thread(target=InfoDirTransversal.t_dir_find, args=(lst[i],)),
+                                         threading.Thread(target=InfoDirTransversal.t_dir_find, args=(lst[i + 1],)),
+                                         threading.Thread(target=InfoDirTransversal.t_dir_find, args=(lst[i + 2],))]
+                    for thread in hidden_url_thread:
+                        thread.start()
 
-            threads.append(threading.Thread(target=Scanner.thread_time_1, args=(url,)))
-            threads.append(threading.Thread(target=Scanner.thread_time_2, args=(url,)))
-            threads.append(threading.Thread(target=Scanner.thread_time_3, args=(url,)))
-            threads.append(threading.Thread(target=Scanner.thread_time_4, args=(url,)))
-            threads.append(threading.Thread(target=Scanner.thread_time_5, args=(url,)))
+                    # Wait for all threads to complete
+                    for thread in hidden_url_thread:
+                        thread.join()
+            except IndexError:
+                return
+            print('URL Harvesting finished.\n')
+
+        for url in lst:
+            print("Testing URL: ", url)
+            threads = [threading.Thread(target=Scanner.thread_time_1, args=(url,)), threading.Thread(target=Scanner.thread_time_2, args=(url,)),
+                       threading.Thread(target=Scanner.thread_time_3, args=(url,)), threading.Thread(target=Scanner.thread_time_4, args=(url,)),
+                       threading.Thread(target=Scanner.thread_time_5, args=(url,))]
+
+            # Create threads for each function
 
             # Start each thread
             for thread in threads:
@@ -140,8 +161,10 @@ class Scanner(Utilities):
 
     @staticmethod
     def split_list(lst, n):
-            for i in range(0, len(lst), n):
-                yield lst[i:i + n]
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+
+
 # class CreateUserSession(Utilities):  # TODO: Create another py module for the new user.
 #     try:
 #         def __init__(self, url):
@@ -152,8 +175,6 @@ class Scanner(Utilities):
 #         print(Fore.RESET)
 #         print("Error: ", e)
 
-
-# Get hidden Paths # TODO: Find way to find hidden URLs/ alternative paths/directory transversal all kinds - https://github.com/jcesarstef/dotdotslash
 # Get Info # TODO: Get app information/versions with nmap
 # Check SSL Certificate # TODO: Check TLS version and security
 
