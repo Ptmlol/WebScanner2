@@ -37,8 +37,8 @@ class Scanner(Utilities):
             threads_main = []
 
             # Scan harvested URLs in sub_lists.
-            for url_set in list(Scanner.split_list(list(self.DataStorage.urls), math.ceil(len(list(self.DataStorage.urls)) / 5))):
-                threads_main.append(threading.Thread(target=Scanner.run_thread, args=(url_set,)))
+            for url_set in list(Scanner.split_list(list(self.DataStorage.urls), math.ceil(len(list(self.DataStorage.urls)) / 3))):
+                threads_main.append(threading.Thread(target=Scanner.run_threads, args=(url_set,)))
 
             for thread in threads_main:
                 thread.start()
@@ -120,44 +120,38 @@ class Scanner(Utilities):
         if Utilities.str_bool(Scanner.config_params['TEST']['xss_tests']):
             InjectionXss.run(url)
 
-    # TODO: Fix Threading for harvesting.
-
     @staticmethod
-    def run_thread(lst):
-        if Utilities.str_bool(Scanner.config_params['TEST']['harvest_url']):
-            try:
-                for i in range(0, len(lst), 3):
-                    print("Harvesting URL: ", lst[i])
-                    print("Harvesting URL: ", lst[i + 1])
-                    print("Harvesting URL: ", lst[i + 2])
-                    hidden_url_thread = [threading.Thread(target=InfoDirTransversal.t_dir_find, args=(lst[i],)),
-                                         threading.Thread(target=InfoDirTransversal.t_dir_find, args=(lst[i + 1],)),
-                                         threading.Thread(target=InfoDirTransversal.t_dir_find, args=(lst[i + 2],))]
-                    for thread in hidden_url_thread:
-                        thread.start()
+    def run_threads(lst):
+        try:
+            harvested = False
+            if Utilities.str_bool(Scanner.config_params['TEST']['harvest_url']) and Scanner.static_scan:
+                for url in lst:
+                    print("Harvesting URL: ", url)
+                    harvest_thread = threading.Thread(target=InfoDirTransversal.t_dir_find, args=(url,))
+                    harvested = True
 
-                    # Wait for all threads to complete
-                    for thread in hidden_url_thread:
-                        thread.join()
-            except IndexError:
-                return
-            print('URL Harvesting finished.\n')
+            for url in lst:
+                print("Testing URL: ", url)
+                threads = [threading.Thread(target=Scanner.thread_time_1, args=(url,)),
+                           threading.Thread(target=Scanner.thread_time_2, args=(url,)),
+                           threading.Thread(target=Scanner.thread_time_3, args=(url,)),
+                           threading.Thread(target=Scanner.thread_time_4, args=(url,)),
+                           threading.Thread(target=Scanner.thread_time_5, args=(url,))]
 
-        for url in lst:
-            print("Testing URL: ", url)
-            threads = [threading.Thread(target=Scanner.thread_time_1, args=(url,)), threading.Thread(target=Scanner.thread_time_2, args=(url,)),
-                       threading.Thread(target=Scanner.thread_time_3, args=(url,)), threading.Thread(target=Scanner.thread_time_4, args=(url,)),
-                       threading.Thread(target=Scanner.thread_time_5, args=(url,))]
+                # Start each thread
+                for thread in threads:
+                    thread.start()
 
-            # Create threads for each function
+                if harvested:
+                    harvest_thread.start()
 
-            # Start each thread
-            for thread in threads:
-                thread.start()
-
-            # Wait for all threads to complete
-            for thread in threads:
-                thread.join()
+                # Wait for all threads to complete
+                for thread in threads:
+                    thread.join()
+            if harvested:
+                harvest_thread.join()
+        except Exception as e:
+            print(e)
 
     @staticmethod
     def split_list(lst, n):
