@@ -607,3 +607,14 @@ class Utilities(ScanConfig):
     @staticmethod
     def str_bool(s):
         return s.lower() in ("yes", "true", "t", "1")
+
+    @staticmethod
+    def get_average(url, form):
+        response_wo_1 = Utilities.submit_form(url, form, "")
+        if not response_wo_1:
+            return None
+        response_time_wo_1 = response_wo_1.elapsed.total_seconds()
+        response_time_wo_2 = Utilities.submit_form(url, form, "").elapsed.total_seconds()
+        response_time_wo_3 = Utilities.submit_form(url, form, "").elapsed.total_seconds()
+        avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3) / 3
+        return avg_response_time

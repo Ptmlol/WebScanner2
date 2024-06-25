@@ -10,20 +10,10 @@ def t_i_sql(url, form, form_data):
         confidence = 0
         sql_type_list = set()
         time_based = False
-        # Get Initial ~ normal response time with no Payload
-        response_wo_1 = Utilities.submit_form(url, form, "")
-        if not response_wo_1:
-            return None, None, None
-        response_time_wo_1 = response_wo_1.elapsed.total_seconds()
-        response_time_wo_2 = Utilities.submit_form(url, form, "").elapsed.total_seconds()
-        response_time_wo_3 = Utilities.submit_form(url, form, "").elapsed.total_seconds()
-
-        if not response_time_wo_1 or not response_time_wo_2 or not response_time_wo_3:
-            return None, None, None
-
         # Create average response time
-        avg_response_time = (response_time_wo_1 + response_time_wo_2 + response_time_wo_3) / 3
-
+        avg_response_time = Utilities.get_average(url, form)
+        if not avg_response_time:
+            return None, None, None
         # Find the injection points for the SQL Payload
         injection_keys = Utilities.extract_injection_fields_from_form(form_data)
         if not injection_keys:
@@ -46,7 +36,7 @@ def t_i_sql(url, form, form_data):
                 sql_type_list.add(DataStorage.inject_type(sql_payload))
                 time_based = True
 
-            if "error" in response_injected.text.lower():  # TODO: Fix generic FP rate for 'error' alone in response.
+            if "error" in response_injected.text.lower():  # TODO: Fix generic FP rate for 'error' alone in response by checking page before injection to make sure it does not contain error
                 confidence += 1
                 sql_type_list.add(DataStorage.inject_type(sql_payload))
 
@@ -74,7 +64,7 @@ def t_i_sql_nfi(url):
         return None
     except Exception as e:
         Utilities.print_except_message('error', e,
-                                  "Something went wrong when testing for SQL Injection with no form inputs.", url)
+                                       "Something went wrong when testing for SQL Injection with no form inputs.", url)
         pass
 
 
@@ -93,12 +83,12 @@ def t_i_ua_sql(url):
             # Check response type (time or feedback)
             if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
                 return sql_payload, headers
-            if "error" in response.text.lower(): # TODO: Other methods of detection
+            if "error" in response.text.lower():  # TODO: Fix generic FP rate for 'error' alone in response by checking page before injection to make sure it does not contain error
                 return sql_payload, headers
         return None, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for User-Agent SQL Injection.",
-                                  url)
+                                       url)
         pass
 
 
@@ -113,7 +103,7 @@ def t_i_xml_sql(url):
             if prepared_url and custom_payload:
                 try:
                     response = ScanConfig.session.post(prepared_url, data=custom_payload,
-                                                 headers={'Content-Type': 'application/xml'})
+                                                       headers={'Content-Type': 'application/xml'})
                 except Exception:
                     continue
             else:
@@ -126,7 +116,7 @@ def t_i_xml_sql(url):
         return None, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for SQL Injection in XML tags.",
-                                  url)
+                                       url)
         pass
 
 
@@ -141,8 +131,9 @@ def run(url):
                 if payload:
                     payload, form_response_list = Utilities.escape_string_html(form_list, payload)
                     html_report.add_vulnerability('SQL Injection',
-                                                      'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}.'.format(
-                                                          url, Utilities.pretty_sql(str(sql_type))), 'Medium', payload=payload, reply="\nInjected Form (Original): {}.".format(form_response_list))
+                                                  'SQL Injection vulnerability identified on form. URL: {}. Vulnerability Type: {}.'.format(
+                                                      url, Utilities.pretty_sql(str(sql_type))), 'Medium', payload=payload,
+                                                  reply="\nInjected Form (Original): {}.".format(form_response_list))
 
         # Bulk up User-Agent SQL Injection detection in the same function
         payload, headers = t_i_ua_sql(url)
@@ -159,14 +150,15 @@ def run(url):
             payload = Utilities.escape_string_html(encoded_single=payload)
             html_report.add_vulnerability('SQL Injection',
                                           'Time based (Blind) SQL Injection vulnerability identified on URL: {}.'.format(
-                                              url), 'Medium', payload=payload, comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
+                                              url), 'Medium', payload=payload,
+                                          comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
 
         payload, xml_url = t_i_xml_sql(url)
         if payload:
             payload = Utilities.escape_string_html(encoded_single=payload)
             html_report.add_vulnerability('SQL Injection in XML tag',
                                           'SQL Injection in XML tag vulnerability identified on URL: {} using custom XML tags.'.format(
-                                              url), 'Critical', payload=payload, comment="Used custom URL for XML SQL Injection URL: {}.". format(xml_url))
+                                              url), 'Critical', payload=payload, comment="Used custom URL for XML SQL Injection URL: {}.".format(xml_url))
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)

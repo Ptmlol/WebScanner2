@@ -6,7 +6,7 @@ from Classes.ScanConfig import ScanConfig
 from Classes.Utilities import Utilities
 from CustomImports import html_report
 
-#TODO: Do XSS (DOM) in DVWA as well and XML as well
+
 # TODO: Detect usage of eval() in DOM
 
 def t_i_xss(url, form, form_data):
@@ -62,7 +62,7 @@ def t_ua_xss(url):
         return None, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for User-Agent XSS Injections.",
-                                  url)
+                                       url)
         pass
 
 
@@ -83,7 +83,8 @@ def run(url):
             payload = Utilities.escape_string_html(encoded_single=payload)
             html_report.add_vulnerability('XSS Injection',
                                           'XSS Injection vulnerability identified on URL: {}'.format(
-                                              url), 'High', payload=payload, comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
+                                              url), 'High', payload=payload,
+                                          comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
 
         payload, headers = t_ua_xss(url)
         if payload:

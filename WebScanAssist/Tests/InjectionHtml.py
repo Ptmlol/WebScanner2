@@ -2,7 +2,7 @@ from Classes.DataStorage import DataStorage
 from Classes.Utilities import Utilities
 from CustomImports import html_report
 
-# TODO: Check why so slow
+
 # TODO: Think of a method for adding confidence dynamically
 
 def t_i_html(url, form, form_data):
@@ -40,7 +40,7 @@ def t_i_html_nfi(url):
         return False
     except Exception as e:
         Utilities.print_except_message('error', e,
-                                  "Something went wrong when testing HTML Injection with non-form inputs.", url)
+                                       "Something went wrong when testing HTML Injection with non-form inputs.", url)
         pass
 
 
@@ -61,7 +61,8 @@ def run(url):
         if t_i_html_nfi(url):
             html_report.add_vulnerability('HTML Injection',
                                           'HTML Injection Vulnerability identified on URL: {}.'.format(
-                                              url), 'Medium', comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
+                                              url), 'Medium',
+                                          comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing HTML Injection.", url)
         pass

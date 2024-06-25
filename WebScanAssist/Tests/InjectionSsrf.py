@@ -3,7 +3,7 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Add more payloads and make work with URLs
+# TODO: Add more payloads and make work with URLs = as in LFI
 
 def t_i_ssrf(url):
     try:
@@ -20,7 +20,7 @@ def t_i_ssrf(url):
         return None, None
     except Exception as e:
         Utilities.print_except_message('error', e,
-                                  "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)
+                                       "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)
         pass
 
 
@@ -35,5 +35,5 @@ def run(url):
         return
     except Exception as e:
         Utilities.print_except_message('error', e,
-                                  "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)
+                                       "Something went wrong when testing for Server Side Request-Forgery (SSRF).", url)
         pass

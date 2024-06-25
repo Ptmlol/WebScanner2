@@ -2,14 +2,16 @@ from Classes.ScanConfig import ScanConfig
 from Classes.Utilities import Utilities
 from CustomImports import html_report
 
+
 # TODO: Make CORS work.
+
 
 def t_cors(url):
     try:
         if ScanConfig.session.get(url).headers['Access-Control-Allow-Origin'] == '*':
             return True
         return
-    except Exception: # Blank by design.
+    except Exception:
         pass
 
 

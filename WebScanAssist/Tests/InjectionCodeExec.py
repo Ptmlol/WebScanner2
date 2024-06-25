@@ -3,13 +3,15 @@ import html
 from Classes.Utilities import Utilities
 from CustomImports import html_report
 
-# TODO: Get mean time of payload so less FP
 
 def t_i_code_exec(url, form, form_data):
     try:
         # Detects blind and standard Code Exec (Ping for 3 seconds)
         code_exec_payload = "|ping -c 3 127.0.0.1"  # 8.8.8.8|cat /etc/passwd
         # Get injection points and inject the payload.
+        avg_response_time = Utilities.get_average(url, form)
+        if not avg_response_time:
+            return None, None
         injection_keys = Utilities.extract_injection_fields_from_form(form_data)
         for injection_key in injection_keys:
             form_data[injection_key] = html.unescape(code_exec_payload)
@@ -17,13 +19,13 @@ def t_i_code_exec(url, form, form_data):
         if not response:
             return None, None
         # Detect both blind and standard Code Execs.
-        if response.elapsed.total_seconds() > 1.5:
+        if response.elapsed.total_seconds() > 1.5 and response.elapsed.total_seconds() > avg_response_time:
             forms, form_data = Utilities.extract_from_html_string('form', response.text)
             return code_exec_payload, forms
         return False, False
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for Code Execution Injection.",
-                                  url)
+                                       url)
         pass
 
 
@@ -41,8 +43,8 @@ def t_i_code_exec_nfi(url):
         return False
     except Exception as e:
         Utilities.print_except_message('error', e,
-                                  "Something went wrong when testing for Code Execution Injection in non-form inputs.",
-                                  url)
+                                       "Something went wrong when testing for Code Execution Injection in non-form inputs.",
+                                       url)
         pass
 
 
@@ -63,8 +65,9 @@ def run(url):
         if t_i_code_exec_nfi(url):
             html_report.add_vulnerability('Code Execution Injection',
                                           'Code Execution Injection Vulnerability identified on URL: {}.'.format(
-                                              url), 'High', comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
+                                              url), 'High',
+                                          comment="Used Non-Form input for injection. Non-form inputs are injectable fields outside of forms or URls (standalone input boxes, form options, etc.)")
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for Code Execution Injection.",
-                                  url)
+                                       url)
         pass
