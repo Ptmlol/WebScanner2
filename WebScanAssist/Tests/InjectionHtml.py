@@ -3,8 +3,6 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Think of a method for adding confidence dynamically
-
 def t_i_html(url, form, form_data):
     try:
         # Select injection points from form details

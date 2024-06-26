@@ -7,8 +7,6 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Detect usage of eval() in DOM
-
 def t_i_xss(url, form, form_data):
     try:
         confidence = 0
