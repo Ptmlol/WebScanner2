@@ -3,6 +3,8 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
+# TODO: Add remaining Confidence to each for function
+
 def t_i_html(url, form, form_data):
     try:
         # Select injection points from form details
