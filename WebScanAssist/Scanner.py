@@ -160,18 +160,7 @@ class Scanner(Utilities):
             yield lst[i:i + n]
 
 
-# class CreateUserSession(Utilities):  # TODO: Create another py module for the new user.
-#     try:
-#         def __init__(self, url):
-#             self.user = Utilities.__init__(self, url)
-#             # self.check_scan_build_url(url, username, password, sec_level=sec_level)
-#     except Exception as e:
-#         print(Fore.RED + "\n[ERROR] Something went wrong when creating a new user session. Quitting..\n")
-#         print(Fore.RESET)
-#         print("Error: ", e)
-
-# Get Info # TODO: Get app information/versions with nmap
-# Check SSL Certificate # TODO: Check TLS version and security
+# Get Info # TODO: Get app information/versions/TLS with nmap
 
 
 if __name__ == '__main__':

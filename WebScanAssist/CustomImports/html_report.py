@@ -51,7 +51,7 @@ try:
         return
 
 
-    def write_html_report():  # TODO: Prettify report
+    def write_html_report():
         try:
             # Load the template
             env = Environment(loader=FileSystemLoader('CustomImports/templates'))
