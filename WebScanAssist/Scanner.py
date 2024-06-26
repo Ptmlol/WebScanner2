@@ -17,9 +17,10 @@ import threading
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 
-# TODO: Fix empty comment list for dvwa app in report.
 # DVWA : https://github.com/digininja/DVWA
+
 # Scanner class handles scan jobs
+
 
 class Scanner(Utilities):
     def __init__(self, url, username=None, password=None, static_scan=None):
@@ -55,19 +56,19 @@ class Scanner(Utilities):
     @staticmethod
     def app_scan(url):
         # Generic app tests over whole app. 1 base URL.
-        if Scanner.config_params['TEST']['browser_cache_tests']:
+        if Utilities.str_bool(Scanner.config_params['TEST']['browser_cache_tests']):
             MisconfigBrowserCache.run(url)
-        if Scanner.config_params['TEST']['xst_tests']:
+        if Utilities.str_bool(Scanner.config_params['TEST']['xst_tests']):
             MisconfigXst.run(url)
-        if Scanner.config_params['TEST']['hhi_tests']:
+        if Utilities.str_bool(Scanner.config_params['TEST']['hhi_tests']):
             MisconfigHhi.run(url)
-        if Scanner.config_params['TEST']['http_tests']:
+        if Utilities.str_bool(Scanner.config_params['TEST']['http_tests']):
             MisconfigHttp.run(url)
-        if Scanner.config_params['TEST']['hsts_tests']:
+        if Utilities.str_bool(Scanner.config_params['TEST']['hsts_tests']):
             MisconfigHsts.run(url)
-        if Scanner.config_params['TEST']['ria_tests']:
+        if Utilities.str_bool(Scanner.config_params['TEST']['ria_tests']):
             MisconfigRia.run(url)
-        if Scanner.config_params['TEST']['robots_tests']:
+        if Utilities.str_bool(Scanner.config_params['TEST']['robots_tests']):
             MisconfigRobots.run(url, Scanner.static_scan)
 
     @staticmethod

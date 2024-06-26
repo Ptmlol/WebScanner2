@@ -179,7 +179,14 @@
 </div>
 {% endif %}
 
-{% if comments_dict %}
+{% set check_var = {'value': False} %}
+{% for url, value in comments_dict.items() %}
+{% if value|length > 0 %}
+{% if check_var.update({'value': value|length}) %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% if check_var['value'] %}
 <div class="container">
     <h4>URL Comments:</h4>
     <ol class="item-list">
@@ -200,7 +207,6 @@
     </ol>
 </div>
 {% endif %}
-
 
 {% if external_links %}
 <div class="container">
