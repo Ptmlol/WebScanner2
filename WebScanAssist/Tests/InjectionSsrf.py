@@ -5,7 +5,7 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Add more payloads. Maybe add CSRF as well.
+# TODO: Maybe add CSRF as well.
 
 def t_i_ssrf(url):
     try:
