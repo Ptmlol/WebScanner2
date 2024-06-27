@@ -20,8 +20,8 @@ def run(url):
         session_vuln, curr_session_cookies = t_ba_session(url)
         if session_vuln:
             html_report.add_vulnerability('Insecure Session (HTTP)',
-                                          'Insecure Session (HTTP) identified on URL: {}. Session was successfully hijacked!'.format(
-                                              url), 'Medium')
+                                          'Insecure Session (HTTP) identified on URL: {}.'.format(
+                                              url), 'Medium', comment="Secure flag could not be found. Session can be hijacked.")
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when checking the session.", url)
         pass

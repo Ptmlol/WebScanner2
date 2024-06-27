@@ -5,8 +5,6 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Modify IDOR to be generic
-
 def t_idor(url, form_data):
     try:
         input_hidden = Utilities.check_hidden_tag(url, form_data)

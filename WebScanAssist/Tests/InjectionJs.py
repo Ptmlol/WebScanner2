@@ -3,8 +3,6 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Add more payloads
-
 def t_i_js(url):
     try:
         js_payload = '/?javascript:alert(testedforjavascriptcodeexecutionrn3284)'
@@ -34,7 +32,8 @@ def run(url):
         if js_payload:
             html_report.add_vulnerability('Javascript Code Injection',
                                           'Javascript Code Injection vulnerability identified on URL: {}'.format(url),
-                                          'Medium', reply="Successfully injected Javascript Code: {} into Custom URL: {}".format(js_payload, new_url), comment="If the application is not designed to accept JS code on this URL, this is a vulnerability.")
+                                          'High', reply="Successfully injected Javascript Code: {} into Custom URL: {}".format(js_payload, new_url),
+                                          comment="If the application is not designed to accept JS code on this URL, this is a vulnerability.")
         return
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for Javascript Execution.", url)

@@ -57,6 +57,12 @@ class DataStorage:
                         DataStorage.word_list.extend(f.readlines())
                 f.close()
                 return DataStorage.word_list
+            elif p_type == "LFI":
+                for filename in os.listdir(os.getcwd() + '/Payloads/LFI-RFI'):
+                    with open(os.path.join(os.getcwd() + '/Payloads/LFI-RFI', filename), 'r', encoding="utf8") as f:
+                        DataStorage.rfi_inj = f.readlines()
+                f.close()
+                return DataStorage.rfi_inj
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong. Payload files cannot be read.")
             print(Fore.RESET)

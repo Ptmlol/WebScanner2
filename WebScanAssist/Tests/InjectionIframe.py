@@ -22,6 +22,7 @@ def extract_iframes(url):
         Utilities.print_except_message('error', e, "Something went wrong when extracting iframes from links.", url)
         pass
 
+
 def build_iframe_url(url, iframe, payload):
     try:  # Get the src value of the iframe to get the destination of the payload.
         if iframe['src'] in url:
@@ -31,6 +32,7 @@ def build_iframe_url(url, iframe, payload):
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when building iframe URL.", url)
         pass
+
 
 def t_i_iframe(url, iframe):
     try:
@@ -57,7 +59,8 @@ def run(url):
                 if iframe_url:
                     html_report.add_vulnerability('iFrame Injection',
                                                   'iFrame Injection Vulnerability identified on URL: {}.'.format(
-                                                      url), 'Low', reply="Iframe: {}".format(Utilities.escape_string_html(encoded_single=iframe)), comment="\nSuccessfully injected google.com Iframe over existing iFrame using Custom URL: {}.".format(iframe_url))
+                                                      url), 'Low', reply="Iframe: {}".format(Utilities.escape_string_html(encoded_single=iframe)),
+                                                  comment="\nSuccessfully injected google.com Iframe over existing iFrame using Custom URL: {}.".format(iframe_url))
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for iFrame Injection.", url)
         pass

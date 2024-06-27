@@ -49,8 +49,7 @@ def t_i_sql(url, form, form_data):
                 return sql_payload, sql_type_list, forms, sql_test_confidence.calculate_confidence()
 
         if confidence >= 1:
-            forms, form_data = Utilities.extract_from_html_string('form', response_injected.text)
-            return sql_payload, sql_type_list, forms, sql_test_confidence.calculate_confidence()
+            return sql_payload, sql_type_list, form, sql_test_confidence.calculate_confidence()
         return None, None, None, None
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing for SQL Injection.", url)
@@ -91,6 +90,8 @@ def t_i_ua_sql(url):
             except Exception:
                 continue
             # Check response type (time or feedback)
+            if not response:
+                continue
             if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
                 sql_test_confidence.add_confidence(severity=0.8, past_occurrences=0.1, exploitability=0.5, impact=0.7)
                 return sql_payload, headers, sql_test_confidence.calculate_confidence()
@@ -120,7 +121,9 @@ def t_i_xml_sql(url):
                 except Exception:
                     continue
             else:
-                break
+                continue
+            if not response:
+                continue
             # Check response type (time or feedback)
             if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
                 sql_test_confidence.add_confidence(severity=0.8, past_occurrences=0.1, exploitability=0.5, impact=0.7)

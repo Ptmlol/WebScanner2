@@ -1,20 +1,23 @@
+import re
+
 from Classes.ScanConfig import ScanConfig
 from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Add more payloads and make work with URLs = as in LFI
+# TODO: Add more payloads. Maybe add CSRF as well.
 
 def t_i_ssrf(url):
     try:
         if '=' in url:
-            ssrf_payload = "=https://www.google.com/"
-            url = url.replace('=', ssrf_payload)
-            response = ScanConfig.session.get(url)
+            ssrf_payload = "https://www.google.com/"
+            new_url = re.sub(r'=(?!.*=).*$', f'={ssrf_payload}', url)
+            response = ScanConfig.session.get(new_url)
             if ssrf_payload in url and response.status_code == 200:
                 return ssrf_payload, url
-            ssrf_payload = '=file:///etc/passwd'
-            url = url.replace('=', ssrf_payload)
+            ssrf_payload = 'file:///etc/passwd'
+            new_url = re.sub(r'=(?!.*=).*$', f'={ssrf_payload}', url)
+            response = ScanConfig.session.get(new_url)
             if ssrf_payload in url and "root:" in response.text.lower():
                 return ssrf_payload, url
         return None, None

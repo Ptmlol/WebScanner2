@@ -7,7 +7,7 @@ from CustomImports import html_report
 def t_i_code_exec(url, form, form_data):
     try:
         # Detects blind and standard Code Exec (Ping for 3 seconds)
-        code_exec_payload = "|ping -c 3 127.0.0.1"  # 8.8.8.8|cat /etc/passwd
+        code_exec_payload = "|ping -c 3 127.0.0.1"
         # Get injection points and inject the payload.
         avg_response_time = Utilities.get_average(url, form)
         if not avg_response_time:
@@ -35,7 +35,7 @@ def t_i_code_exec_nfi(url):
         code_exec_payload = "| ping -c 3 127.0.0.1"
         response_injected = Utilities.no_form_input_content(url, code_exec_payload)
         if not response_injected:
-            return 0
+            return None
         # Detect both blind and standard Code Execs.
         for response_inj in response_injected:
             if response_inj.elapsed.total_seconds() > 1.5:
