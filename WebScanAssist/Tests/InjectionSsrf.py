@@ -5,8 +5,6 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Maybe add CSRF as well.
-
 def t_i_ssrf(url):
     try:
         if '=' in url:

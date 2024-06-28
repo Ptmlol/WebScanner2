@@ -8,8 +8,6 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO Check why stored XSS does not work dvwa
-
 def t_i_xss(url, form, form_data):
     try:
         confidence = 0
@@ -23,7 +21,7 @@ def t_i_xss(url, form, form_data):
             if not response_injected:
                 continue
             if (str(xss_payload).lower() in str(response_injected.text).lower()) or (
-                    str(xss_payload).lower() in str(html.unescape(response_injected.text.lower()))):
+                    str(xss_payload).lower() in str(html.unescape(response_injected.text.lower()))) or str(html.unescape(str(xss_payload).lower()) in str(response_injected.text).lower()):
                 confidence += 1
                 sql_test_confidence.add_confidence(severity=0.8, past_occurrences=0.1, exploitability=0.6, impact=0.3)
             if confidence == 4:

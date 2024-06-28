@@ -1,28 +1,35 @@
 import re
 import urllib.parse
 
+from Classes.DataStorage import DataStorage
 from Classes.ScanConfig import ScanConfig
 from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Create detection of sensitive data in this robots by the above URL
-# TODO: Prettify the print of robots contents to report or to HTML report
 # https://github.com/danielmiessler/RobotsDisallowed/blob/master/top1000.txt
-
 def run(main_url, scan_type):
     try:
+        sensitive_list = set()
         if 'robots' not in main_url and scan_type is None:
-            url_robots = urllib.parse.urljoin(main_url, '/robots.txt')
+            if main_url[-1] == '/':
+                url_robots = main_url + 'robots.txt'
+            else:
+                url_robots = main_url + '/robots.txt'
         else:
             url_robots = main_url
         req_robots = ScanConfig.session.get(url_robots)
         robots_urls = re.findall('Disallow: (.*)', req_robots.text)
         if robots_urls:
-            html_report.add_vulnerability('Robots.txt',
-                                          'Robots.txt contains the following values: \n{}'.format(
-                                              ['<br>' + str(i).replace("'", "").replace('[', '').replace(']', '') for i in robots_urls]),
-                                          'Informational')
+            for sensitive in DataStorage.payloads('ROBO'):
+                sensitive_list.update(robot for robot in robots_urls if sensitive.strip() in robot)
+            if sensitive_list:
+                html_report.add_vulnerability('Robots.txt',
+                                              'Robots.txt contains the following sensitive values:', comment='Possible Sensitive values identified in robots.txt:' +
+                                                                                                             str([str(i).replace("'", "").replace('[', '').replace(']', '').replace('\r', '')
+                                                                                                                  for i in sensitive_list]), confidence='Medium')
+
+
     except Exception as e:
         Utilities.print_except_message('error', e, "Something went wrong when testing Robots.txt.", main_url)
         pass

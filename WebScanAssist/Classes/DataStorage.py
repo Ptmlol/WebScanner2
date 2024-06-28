@@ -53,6 +53,8 @@ class DataStorage:
                 return DataStorage.xss_inj
             elif p_type == "WORDS":
                 for filename in os.listdir(os.getcwd() + '/Payloads/WordLists/'):
+                    if 'robots' in filename:
+                        continue
                     with open(os.path.join(os.getcwd() + '/Payloads/WordLists/', filename), 'r', encoding="utf8") as f:
                         DataStorage.word_list.extend(f.readlines())
                 f.close()
@@ -63,6 +65,11 @@ class DataStorage:
                         DataStorage.rfi_inj = f.readlines()
                 f.close()
                 return DataStorage.rfi_inj
+            elif p_type == "ROBO":
+                with open(os.path.join(os.getcwd() + '/Payloads/WordLists/', 'robots.txt'), 'r', encoding="utf8") as f:
+                    DataStorage.robots_list = f.readlines()
+                f.close()
+                return DataStorage.robots_list
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong. Payload files cannot be read.")
             print(Fore.RESET)

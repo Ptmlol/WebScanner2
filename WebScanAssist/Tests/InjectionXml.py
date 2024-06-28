@@ -3,8 +3,6 @@ from Classes.Utilities import Utilities
 from CustomImports import html_report
 
 
-# TODO: Might need to add other payloads
-
 def run(url):
     try:
         payload = 'file:///etc/passwd'

@@ -39,7 +39,8 @@ def t_i_sql(url, form, form_data):
                 sql_type_list.add(DataStorage.inject_type(sql_payload))
                 time_based = True
 
-            if "error" in response_injected.text.lower():  # TODO: Fix generic FP rate for 'error' alone in response by checking page before injection to make sure it does not contain error
+            if ("error" in response_injected.text.lower() and 'error' not in ScanConfig.session.get(url)) or (
+                    'error' in ScanConfig.session.get(url) and sql_payload in response_injected.text.lower()):
                 confidence += 1
                 sql_test_confidence.add_confidence(past_occurrences=0.6, exploitability=0.5, impact=0.3)
                 sql_type_list.add(DataStorage.inject_type(sql_payload))
@@ -95,7 +96,8 @@ def t_i_ua_sql(url):
             if response.elapsed.total_seconds() > response_time_wo and response.elapsed.total_seconds() > 2:
                 sql_test_confidence.add_confidence(severity=0.8, past_occurrences=0.1, exploitability=0.5, impact=0.7)
                 return sql_payload, headers, sql_test_confidence.calculate_confidence()
-            if "error" in response.text.lower():  # TODO: Fix generic FP rate for 'error' alone in response by checking page before injection to make sure it does not contain error
+            if ("error" in response.text.lower() and 'error' not in ScanConfig.session.get(url)) or (
+                    'error' in ScanConfig.session.get(url) and sql_payload in response.text.lower()):
                 sql_test_confidence.add_confidence(severity=0.8, past_occurrences=0.1, exploitability=0.5, impact=0.7)
                 return sql_payload, headers, sql_test_confidence.calculate_confidence()
         return None, None, None
