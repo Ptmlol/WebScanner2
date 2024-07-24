@@ -11,7 +11,8 @@ from Classes.Utilities import Utilities
 from Tests import InjectionIframe, InjectionSql, InjectionCodeExec, InjectionPhpExec, InjectionSsi, \
     BrokenAuthRoleDefDir, BrokenAuthRoleDefCookie, InjectionXss, InjectionIdor, MisconfigCors, InjectionSsrf, \
     InjectionXml, InjectionLfi, InfoComments, InjectionHtml, BrokenAuthSession, MisconfigBrowserCache, MisconfigXst, \
-    MisconfigHhi, MisconfigHttp, MisconfigHsts, MisconfigRia, MisconfigRobots, InjectionJs, InfoDirTransversal
+    MisconfigHhi, MisconfigHttp, MisconfigHsts, MisconfigRia, MisconfigRobots, InjectionJs, InfoDirTransversal, \
+    InfoVersionFinder
 import threading
 
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
@@ -70,6 +71,7 @@ class Scanner(Utilities):
             MisconfigRia.run(url)
         if Utilities.str_bool(Scanner.config_params['TEST']['robots_tests']):
             MisconfigRobots.run(url, Scanner.static_scan)
+        InfoVersionFinder.run(url)
 
     @staticmethod
     def thread_time_1(url):

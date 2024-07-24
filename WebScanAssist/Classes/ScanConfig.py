@@ -13,6 +13,7 @@ class ScanConfig:
     # Initialize the ignored links and errors file parameters
     err_file = None
     ignored_links = None
+    config_params = config.Config().config_object
 
     def __init__(self, url):
         try:
@@ -23,7 +24,6 @@ class ScanConfig:
             # Initialize Data Storage.
             self.DataStorage = DataStorage()
             # Initialize Config File
-            self.config_params = config.Config().config_object
             # Empty list of links pairs used for hierarchy.
             self.link_pairs = []
 
@@ -69,7 +69,7 @@ class ScanConfig:
             quit()
 
         try:  # Import Ignored URLs from Config file.
-            ScanConfig.ignored_links = self.config_params['URLS']['ignored'].split(",")
+            ScanConfig.ignored_links = ScanConfig.config_params['URLS']['ignored'].split(",")
         except Exception as e:
             print(Fore.RED + "\n[ERROR] Something went wrong when opening the Ignored Links file. Quitting..\n")
             print(Fore.RESET)
