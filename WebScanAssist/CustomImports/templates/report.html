@@ -120,7 +120,7 @@
             opacity: 1;
             visibility: visible;
             transition: max-height 0.3s ease, opacity 0.3s ease;
-            overflow-y: scroll;c
+            overflow-y: scroll;
         }
 
         .dropdown pre {
@@ -231,6 +231,26 @@
     {% endfor %}
 </div>
 {% endif %}
+
+<div class="container">
+    {% if cve_dict %}
+    <h4>CVE Scan Result:</h4>
+    {% endif %}
+    {% for cve in cve_dict %}
+    <div class="vulnerability">
+        <div class="severity">CVE ID: {{ cve.cve_id }}</div>
+        <div class="type">Provider: {{ cve.app_name_supp }}</div>
+        <div class="type">Application: {{ cve.app_name_prod }}</div>
+        <div class="details">
+            <strong>CVE Details:</strong>
+            <p>{{ cve.cve_description }}</p>
+            <p>CVE URL:<a href={{cve.cve_url}}>{{ cve.cve_url }}</a></p>
+            <p>CVE Score:{{ cve.cve_score }}</p>
+            <p>CVE Severity:{{ cve.cve_severity }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
 
 <div class="footer">
     &copy; 2024 Python Web Vulnerability Scanner - Naiboiu Teodor
