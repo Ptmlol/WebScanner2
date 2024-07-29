@@ -28,10 +28,13 @@ def get_cpes(app_name, version):
     API_KEY = ScanConfig.config_params['API']['API_KEY']
     try:
         cpe_list = set()
-        cpes = nvdlib.searchCPE(keywordSearch=app_name, key=API_KEY ,delay=1)
+        cpes = nvdlib.searchCPE(keywordSearch=app_name + ' ' + version, keywordExactMatch=True, key=API_KEY ,delay=1)
         for cpe in cpes:
             cpe_array = str(cpe.cpeName).split(':')
-            if (':' + str(version) + ':') in str(cpe.cpeName) and (cpe_array[3] == app_name or cpe_array[4] == app_name):
+            cpe_id = ':'.join(cpe_array[:6])
+            print(cpe_id)
+            if (':' + str(version) + ':') in str(cpe.cpeName) and (cpe_array[3] == app_name or cpe_array[4] == app_name) and len(list(filter(lambda x: x.startswith(cpe_id), cpe_list))) == 0:
+                print(cpe.cpeName)
                 cpe_list.add(cpe.cpeName)
         return cpe_list
     except Exception as e:
@@ -56,7 +59,7 @@ def run(url):
     try:
         app_dict = {}
         cve_dict = {}
-        cpe_list = []
+        cpe_list = set()
         non_version_app_list = []
         total_apps = get_apps(url)
         for app_name, version in total_apps.items():
@@ -65,10 +68,10 @@ def run(url):
             if version:
                 cpe = get_cpes(app_name.lower(), version)
                 if cpe:
-                    cpe_list.extend(cpe)
+                    cpe_list.update(cpe)
             else:
                 non_version_app_list.append(app_name)
-        for cpeName in cpe_list: # TODO: Remove duplicates
+        for cpeName in cpe_list:
             cve_dict.update(get_cve(cpeName))
 
         for name, dict_array in cve_dict.items():
