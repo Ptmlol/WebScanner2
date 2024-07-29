@@ -47,6 +47,7 @@
         }
 
         .details {
+            position: relative;
             background-color: #f9f9f9;
             padding: 10px;
             border-radius: 5px;
@@ -131,20 +132,48 @@
             transition: max-height 0.3s ease, opacity 0.3s ease;
         }
 
+        .plus {
+            width: 16px;
+            /*display: flex;*/
+            /*justify-content: center;*/
+            /*align-items: center;*/
+        }
+
+        .cve-overview {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+        }
+
+         .cve-overview-right {
+             display: flex;
+             margin: 0;
+             /*padding-right: 5px;*/
+        }
+
+        .severity-color {
+            font-weight: bold;
+        }
+
+        .score-color {
+            font-weight: bold;
+            color: black;
+        }
+
     </style>
 </head>
 <body>
 <div class="container">
     <h1>Vulnerability Report</h1>
     {% if vulnerabilities %}
-    <h4>Vulnerability Scan Result:</h4>
+    <h4 style="display: flex; justify-content: space-between"><span>Vulnerability Scan Result:</span> <span style="font-weight: normal">{{ timestamp }} UTC</span></h4>
     {% endif %}
     {% for vulnerability in vulnerabilities %}
     <div class="vulnerability">
         <div class="severity">Confidence: {{ vulnerability.severity }}</div>
         <div class="type">{{ vulnerability.type }}</div>
         <div class="details" onclick="toggleDropdown(event)">
-            <strong>+ Details:</strong>
+            <strong class="plus">+</strong><strong style="color:rgba(0, 0, 0, 0.4); position: absolute; left: 24px"> Details:</strong>
             <pre>{{ vulnerability.details }}</pre>
             {% if vulnerability.dropdown_details %}
             <div class="dropdown">
@@ -238,15 +267,24 @@
     {% endif %}
     {% for cve in cve_dict %}
     <div class="vulnerability">
-        <div class="severity">CVE ID: {{ cve.cve_id }}</div>
+        <div class="severity">ID: {{ cve.cve_id }}</div>
         <div class="type">Provider: {{ cve.app_name_supp }}</div>
         <div class="type">Application: {{ cve.app_name_prod }}</div>
         <div class="details">
-            <strong>CVE Details:</strong>
+            <div class="cve-overview">
+                <strong>Details:</strong>
+                <div class="cve-overview-right">
+                    <span style="color:rgba(0, 0, 0, 0.4)">Score <span class="score-color"> {{ cve.cve_score }} </span></span>
+                    &nbsp;
+                    &nbsp;
+                    &nbsp;
+                    <span style="color:rgba(0, 0, 0, 0.4)" >Severity <span class="severity-color">{{ cve.cve_severity }}</span></span>
+                </div>
+            </div>
             <p>{{ cve.cve_description }}</p>
-            <p>CVE URL:<a href={{cve.cve_url}}>{{ cve.cve_url }}</a></p>
-            <p>CVE Score:{{ cve.cve_score }}</p>
-            <p>CVE Severity:{{ cve.cve_severity }}</p>
+            <p>CVE URL: <a href={{cve.cve_url}}>{{ cve.cve_url }}</a></p>
+
+
         </div>
     </div>
     {% endfor %}
@@ -257,15 +295,29 @@
 </div>
 
 <script>
+    const severityColors = {
+        'LOW': 'grey',
+        'MEDIUM': 'gold',
+        'HIGH': 'red',
+        'CRITICAL': 'purple'
+
+    }
+    window.onload = () => {
+        document.querySelectorAll('.severity-color').forEach(d => d.style.color = severityColors[d.innerHTML])
+
+    }
 
     function toggleDropdown(event) {
         event.target.querySelector('.dropdown').classList.add('show');
-        console.log(event)
+        event.target.querySelector('.plus').innerHTML = '-'
     }
 
     window.onclick = function (event) {
         if (!event.target.closest('.details')) {
+            document.querySelectorAll('.plus').forEach(d => d.innerHTML = '+');
             document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show'));
+
+
         }
     }
 

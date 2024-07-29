@@ -68,7 +68,7 @@ def run(url):
                     cpe_list.extend(cpe)
             else:
                 non_version_app_list.append(app_name)
-        for cpeName in cpe_list: # Remove duplicates
+        for cpeName in cpe_list: # TODO: Remove duplicates
             cve_dict.update(get_cve(cpeName))
 
         for name, dict_array in cve_dict.items():
