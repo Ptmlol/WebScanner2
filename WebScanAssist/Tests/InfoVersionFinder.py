@@ -32,7 +32,6 @@ def get_cpes(app_name, version):
         for cpe in cpes:
             cpe_array = str(cpe.cpeName).split(':')
             cpe_id = ':'.join(cpe_array[:6])
-            print(cpe_id)
             if (':' + str(version) + ':') in str(cpe.cpeName) and (cpe_array[3] == app_name or cpe_array[4] == app_name) and len(list(filter(lambda x: x.startswith(cpe_id), cpe_list))) == 0:
                 print(cpe.cpeName)
                 cpe_list.add(cpe.cpeName)
