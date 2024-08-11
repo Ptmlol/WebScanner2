@@ -3,7 +3,7 @@ import os
 import requests
 from colorama import Fore
 
-from Classes.DataStorage import DataStorage
+from Core.DataStorage import DataStorage
 from Config import config
 
 
@@ -20,10 +20,9 @@ class ScanConfig:
             # Initialize Scanner Configuration Parameters.
             self.url = url
 
-            
             # Initialize Data Storage.
             self.DataStorage = DataStorage()
-            # Initialize Config File
+
             # Empty list of links pairs used for hierarchy.
             self.link_pairs = []
 

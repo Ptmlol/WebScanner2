@@ -1,8 +1,8 @@
 # https://github.com/aels/subdirectories-discover/tree/main
 
-from Classes.DataStorage import DataStorage
-from Classes.ScanConfig import ScanConfig
-from CustomImports import html_report
+from Core.DataStorage import DataStorage
+from Core.ScanConfig import ScanConfig
+from Report import html_report
 
 
 def t_dir_find(url):

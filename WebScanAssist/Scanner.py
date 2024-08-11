@@ -5,9 +5,9 @@ from colorama import Fore
 import warnings
 from bs4 import MarkupResemblesLocatorWarning
 import argparse
-from CustomImports import html_report
+from Report import html_report
 import re
-from Classes.Utilities import Utilities
+from Core.Utilities import Utilities
 from Tests import InjectionIframe, InjectionSql, InjectionCodeExec, InjectionPhpExec, InjectionSsi, \
     BrokenAuthRoleDefDir, BrokenAuthRoleDefCookie, InjectionXss, InjectionIdor, MisconfigCors, InjectionSsrf, \
     InjectionXml, InjectionLfi, InfoComments, InjectionHtml, BrokenAuthSession, MisconfigBrowserCache, MisconfigXst, \

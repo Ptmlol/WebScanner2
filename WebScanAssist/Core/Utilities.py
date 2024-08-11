@@ -2,7 +2,7 @@ from datetime import datetime
 
 from werkzeug.exceptions import InternalServerError
 
-from Classes.ScanConfig import ScanConfig
+from Core.ScanConfig import ScanConfig
 from bs4 import BeautifulSoup
 from bs4 import MarkupResemblesLocatorWarning
 import warnings
@@ -12,7 +12,7 @@ import urllib.request
 import re
 from colorama import Fore
 
-from CustomImports import html_report
+from Report import html_report
 
 firstCallSpider = 1
 

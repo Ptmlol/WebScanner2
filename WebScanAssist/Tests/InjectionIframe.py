@@ -1,9 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
 
-from Classes.Utilities import Utilities
-from Classes.ScanConfig import ScanConfig
-from CustomImports import html_report
+from Core.Utilities import Utilities
+from Core.ScanConfig import ScanConfig
+from Report import html_report
 
 
 def extract_iframes(url):

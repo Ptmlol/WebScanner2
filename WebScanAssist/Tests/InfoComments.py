@@ -1,8 +1,8 @@
 import re
 
-from Classes.ScanConfig import ScanConfig
-from Classes.Utilities import Utilities
-from CustomImports import html_report
+from Core.ScanConfig import ScanConfig
+from Core.Utilities import Utilities
+from Report import html_report
 
 
 def run(url):

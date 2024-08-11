@@ -2,11 +2,11 @@ import re
 
 from werkzeug.exceptions import InternalServerError
 
-from Classes.Confidence import Confidence
-from Classes.DataStorage import DataStorage
-from Classes.ScanConfig import ScanConfig
-from Classes.Utilities import Utilities
-from CustomImports import html_report
+from Core.Confidence import Confidence
+from Core.DataStorage import DataStorage
+from Core.ScanConfig import ScanConfig
+from Core.Utilities import Utilities
+from Report import html_report
 
 
 def t_i_lfi(url):

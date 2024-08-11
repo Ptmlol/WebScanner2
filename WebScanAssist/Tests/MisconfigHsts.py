@@ -1,5 +1,5 @@
-from Classes.Utilities import Utilities
-from CustomImports import html_report
+from Core.Utilities import Utilities
+from Report import html_report
 
 
 def run(main_url):

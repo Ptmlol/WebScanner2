@@ -1,7 +1,7 @@
-from Classes.Confidence import Confidence
-from Classes.DataStorage import DataStorage
-from Classes.Utilities import Utilities
-from CustomImports import html_report
+from Core.Confidence import Confidence
+from Core.DataStorage import DataStorage
+from Core.Utilities import Utilities
+from Report import html_report
 
 
 def t_i_html(url, form, form_data):

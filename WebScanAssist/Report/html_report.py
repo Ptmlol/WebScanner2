@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from jinja2 import Environment, FileSystemLoader
-from CustomImports import generate_tree
+from Report import generate_tree
 
 vulnerabilities = []
 tree_json = {}
@@ -60,7 +60,7 @@ try:
     def write_html_report():
         try:
             # Load the template
-            env = Environment(loader=FileSystemLoader('CustomImports/templates'))
+            env = Environment(loader=FileSystemLoader('Report/templates'))
             template = env.get_template('report.html')
             # Render the template with the data
             output = template.render(vulnerabilities=vulnerabilities, tree_json=tree_json, external_links=external_links, non_accessible_links=non_accessible_links,

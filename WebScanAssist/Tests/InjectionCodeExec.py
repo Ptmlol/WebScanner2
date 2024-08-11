@@ -1,7 +1,7 @@
 import html
 
-from Classes.Utilities import Utilities
-from CustomImports import html_report
+from Core.Utilities import Utilities
+from Report import html_report
 
 
 def t_i_code_exec(url, form, form_data):

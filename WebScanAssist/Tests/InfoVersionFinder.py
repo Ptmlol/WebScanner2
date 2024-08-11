@@ -1,15 +1,15 @@
 import html
 import warnings
 import ast
-from CustomImports import html_report
+from Report import html_report
 
 warnings.simplefilter("ignore", UserWarning)
 import requests
-from Classes.ScanConfig import ScanConfig
+from Core.ScanConfig import ScanConfig
 import nvdlib
 from Wappalyzer import Wappalyzer, WebPage
 
-from Classes.Utilities import Utilities
+from Core.Utilities import Utilities
 from Scanner import Scanner
 from colorama import Fore
 
@@ -33,7 +33,6 @@ def get_cpes(app_name, version):
             cpe_array = str(cpe.cpeName).split(':')
             cpe_id = ':'.join(cpe_array[:6])
             if (':' + str(version) + ':') in str(cpe.cpeName) and (cpe_array[3] == app_name or cpe_array[4] == app_name) and len(list(filter(lambda x: x.startswith(cpe_id), cpe_list))) == 0:
-                print(cpe.cpeName)
                 cpe_list.add(cpe.cpeName)
         return cpe_list
     except Exception as e:
