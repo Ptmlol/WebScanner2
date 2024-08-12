@@ -73,6 +73,39 @@ class Utilities(ScanConfig):
                                            url)
             quit()
 
+    def check_scan_build_url(self, url, username=None, password=None, static_scan=None, sec_level=None):
+        try:
+            # Full scan required
+            if static_scan is None:
+                # Check if static scan is not required
+                if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
+                    # if username or password not provided and are required, throw error
+                    if not (username and password):
+                        print("You need to provide login credentials first, check --help for details!")
+                        quit()
+                    # If login is required and static scan not, do login and crawl web app.
+                    elif self.process_login(username, password, sec_level):
+                        # Scan first time for URL provided by Main, then continue with others.
+                        self.spider(url)
+                else:
+                    # If login is not required, perform crawling.
+                    self.spider(url)
+
+            # Static Scan required
+            else:
+                if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
+                    # if username or password not provided and are required, throw error
+                    if not (username and password):
+                        print("You need to provide login credentials first, check --help for details!")
+                        quit()
+                    elif self.process_login(username, password, sec_level):
+                        self.DataStorage.urls.add(url)
+            html_report.create_tree(self.link_pairs)
+        except Exception as e:
+            Utilities.print_except_message('error', e,
+                                           "Something went wrong when checking for login requirements or scan options. Quitting..")
+            quit()
+
     def check_sec_input(self, sec_level):
         try:
             # Check if provided security level is valid recursively.
@@ -331,39 +364,6 @@ class Utilities(ScanConfig):
             Utilities.print_except_message('error', e, "Something went wrong when saving cookies.")
             pass
 
-    def check_scan_build_url(self, url, username=None, password=None, static_scan=None, sec_level=None):
-        try:
-            # Full scan required
-            if static_scan is None:
-                # Check if static scan is not required
-                if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
-                    # if username or password not provided and are required, throw error
-                    if not (username and password):
-                        print("You need to provide login credentials first, check --help for details!")
-                        quit()
-                    # If login is required and static scan not, do login and crawl web app.
-                    elif self.process_login(username, password, sec_level):
-                        # Scan first time for URL provided by Main, then continue with others.
-                        self.spider(url)
-                else:
-                    # If login is not required, perform crawling.
-                    self.spider(url)
-
-            # Static Scan required
-            else:
-                if self.session.get(url, timeout=300).url != url or "login" in self.session.get(url, timeout=300).url:
-                    # if username or password not provided and are required, throw error
-                    if not (username and password):
-                        print("You need to provide login credentials first, check --help for details!")
-                        quit()
-                    elif self.process_login(username, password, sec_level):
-                        self.DataStorage.urls.add(url)
-            html_report.create_tree(self.link_pairs)
-        except Exception as e:
-            Utilities.print_except_message('error', e,
-                                           "Something went wrong when checking for login requirements or scan options. Quitting..")
-            quit()
-
     def extract_non_form_inputs(self, url):
         try:
             name_list = []
@@ -424,7 +424,7 @@ class Utilities(ScanConfig):
                     if field.get('name'):
                         form_data[field.get('name')] = payload
 
-            # Harvest page for scripts containing path, since none can be found
+            # Harvest page for scripts containing path
             # Brute-force inputs for destination path.
             try:
                 potential_paths = re.findall(r'["\']([^"\']*\.php)["\']', ScanConfig.session.get(url).text)
