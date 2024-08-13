@@ -316,8 +316,6 @@ class Utilities(ScanConfig):
                 xml_payload = '''<?xml version="1.0" encoding="utf-8"?>
                                 <!DOCTYPE root [<!ENTITY XXE SYSTEM "{}"> ]>
                                 <bongus><bongus2>&XXE</bongus2><bongus3>&XXE</bongus3></bongus>'''.format(payload)
-                # if 'error' in str(self.session.post(url, data=xml_payload, headers={'Content-Type': 'application/xml'}).content):
-                #     return True, 'Low'
                 return None, xml_payload
         except Exception as e:
             Utilities.print_except_message('error', e, "Something went wrong when testing for XML Injection.", url)

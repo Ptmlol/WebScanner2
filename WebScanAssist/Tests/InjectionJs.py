@@ -5,7 +5,7 @@ from Report import html_report
 
 def t_i_js(url):
     try:
-        js_payload = '/?javascript:alert(testedforjavascriptcodeexecutionrn3284)'
+        js_payload = '/?javascript:alert("testedforjavascriptcodeexecutionrn3284")'
         if url[-1] != '/':
             new_url = url + js_payload
             response = ScanConfig.session.get(new_url)
