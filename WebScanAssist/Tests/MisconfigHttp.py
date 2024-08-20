@@ -5,6 +5,7 @@ from Report import html_report
 
 def run(main_url):
     try:
+        print("Testing PUT method policy..")
         response = ScanConfig.session.put(str(main_url) + '/test.html', data={"test": 'test'})
         if str(response.status_code).startswith("3") or str(response.status_code).startswith("2"):
             html_report.add_vulnerability('HTTP PUT Method Vulnerability',

@@ -20,6 +20,7 @@ def t_weak_browser_cache(url):
 
 def run(main_url):
     try:
+        print("Testing Caching policies..")
         if t_weak_browser_cache(main_url):
             html_report.add_vulnerability('Cache Weakness',
                                           'Potential Browser Cache Weakness vulnerability identified.'.format(

@@ -7,6 +7,7 @@ from Report import html_report
 
 def t_dir_find(url):
     try:
+        print("Searching for hidden URL paths..")
         word_list = DataStorage.payloads('WORDS')
         for word in word_list:
             if url[-1] != '/':

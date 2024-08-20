@@ -4,6 +4,7 @@ from Report import html_report
 
 def run(main_url):
     try:
+        print("Testing HTTP Strict Transport Security policy..")
         headers = Utilities.extract_headers(main_url)
         if 'strict' not in str(headers).lower():
             html_report.add_vulnerability('HTTP Strict Transport Security not found',

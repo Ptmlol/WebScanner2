@@ -10,6 +10,7 @@ from Report import html_report
 # https://github.com/danielmiessler/RobotsDisallowed/blob/master/top1000.txt
 def run(main_url, scan_type):
     try:
+        print("Testing for sensitive data in the Robots.txt file..")
         sensitive_list = set()
         if 'robots' not in main_url and scan_type is None:
             if main_url[-1] == '/':

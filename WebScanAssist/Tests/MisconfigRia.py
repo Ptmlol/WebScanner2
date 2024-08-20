@@ -5,6 +5,7 @@ from Report import html_report
 
 def run(main_url):
     try:
+        print("Testing RIA files policy..")
         content = None
         if 'clientaccesspolicy.xml' in main_url.lower() or 'crossdomain.xml' in main_url.lower():
             content = ScanConfig.session.get(main_url)

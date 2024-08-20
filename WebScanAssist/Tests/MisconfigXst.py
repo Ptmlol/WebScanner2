@@ -18,6 +18,7 @@ def t_xst(url):
 
 def run(main_url):
     try:
+        print("Testing TRACE method policy..")
         if t_xst(main_url):
             html_report.add_vulnerability('Cross-Site Tracing (XST)',
                                           'Cross-Site Tracing (XST) vulnerability identified on URL: {}'.format(

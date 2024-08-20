@@ -54,6 +54,7 @@ def get_cve(cpe_name):
 
 def run(url):
     try:
+        print("Scanning for CVEs..")
         app_dict = {}
         cve_dict = {}
         cpe_list = set()

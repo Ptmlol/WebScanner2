@@ -66,14 +66,12 @@ try:
             output = template.render(vulnerabilities=vulnerabilities, tree_json=tree_json, external_links=external_links, non_accessible_links=non_accessible_links,
                                      comments_dict=comments_dict, hidden_paths=hidden_paths, cve_dict=cve_dict, timestamp=datetime.utcnow().strftime("%m/%d/%Y, %H:%M:%S"))
             # Save the output to a file
-            # with open('Vulnerability_Report_' + datetime.now().strftime('%Y-%m-%d_%H-%M') + '.html', 'w', encoding='utf-8') as f:
-            with open('report.html', 'w', encoding='utf-8') as f:  # temp until on prod.
+            with open('Vulnerability_Report_' + datetime.now().strftime('%Y-%m-%d_%H-%M') + '.html', 'w', encoding='utf-8') as f:
+            #with open('report.html', 'w', encoding='utf-8') as f:  # temp until on prod.
                 f.write(output)
-
             f.close()
             return
         except Exception as e:
             print(e)
-
 except Exception as e:
     print(e)

@@ -207,6 +207,8 @@ if __name__ == '__main__':
 
         Scanner.scan()
         html_report.write_html_report()
+        print("Finished.")
+        print("See report file for findings.")
     except Exception as e:
         print(Fore.RED + "\n[ERROR] FATAL ERROR OCCURRED. Quitting..\n")
         print(Fore.RESET)

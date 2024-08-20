@@ -21,6 +21,7 @@ def t_i_host_header(url):
 
 def run(main_url):
     try:
+        print("Testing Host Header Injection..")
         if t_i_host_header(main_url):
             html_report.add_vulnerability('Host-Header Injection',
                                           'Host-Header Injection vulnerability identified on URL: {}'.format(
