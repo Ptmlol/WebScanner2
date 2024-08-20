@@ -15,7 +15,6 @@ def t_i_lfi(url):
         confidence = 0
         new_url = None
         forms = None
-        # for html_payload in self.DataStorage.payloads("HTML"):
         # https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/File%20Inclusion/README.md
         try:
             for lfi_script in DataStorage.payloads("LFI"):

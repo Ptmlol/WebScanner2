@@ -17,7 +17,6 @@ def get_apps(url):
     response = ScanConfig.session.get(url)
     if response.status_code != 200:
         return
-
     wappalyzer = Wappalyzer.latest()
     webpage = WebPage.new_from_response(response)
     return wappalyzer.analyze_with_versions(webpage)
