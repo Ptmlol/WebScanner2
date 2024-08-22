@@ -161,10 +161,6 @@ class Scanner(Utilities):
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
 
-
-# Get Info # TODO: Get app information/versions/TLS with nmap
-
-
 if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser(description='Scan Web Application for Vulnerabilities')
